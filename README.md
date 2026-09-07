@@ -2,6 +2,8 @@
 
 [中文](README.zh.md) · English
 
+<p align="center"><img src="assets/logo.png" alt="mdbook" width="160"></p>
+
 Convert Markdown files into a book-style PDF with a table of contents and page numbers.
 
 ## Features
@@ -13,7 +15,7 @@ Convert Markdown files into a book-style PDF with a table of contents and page n
 
 ## Install
 
-Recommended: download `mdbook-1.1-setup.exe` from [Releases](../../releases), double-click to install — all dependencies bundled, ready to use.
+Recommended: download `mdbook-1.1.1-setup.exe` from [Releases](../../releases), double-click to install — all dependencies bundled, ready to use.
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 

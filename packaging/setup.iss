@@ -1,10 +1,10 @@
-; mdbook 1.1 —— Windows 安装脚本（Inno Setup 6）
+; mdbook 1.1.1 —— Windows 安装脚本（Inno Setup 6）
 ; 更新点：
-;   * 新增软件图标 mdbook.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
+;   * 全新设计的软件图标 mdbook.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
 ;   * 桌面 + 开始菜单快捷方式改为安装时可勾选（默认勾选，符合常规软件）
 ;   * 开始菜单提供「卸载 mdbook」，并确保写入系统「应用」列表（可在设置/开始菜单右键卸载）
 #define MyAppName "mdbook"
-#define MyAppVersion "1.1"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/mdbook"
 
@@ -21,7 +21,7 @@ DefaultDirName={autopf}\mdbook
 DefaultGroupName=mdbook
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=mdbook-1.1-setup
+OutputBaseFilename=mdbook-1.1.1-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

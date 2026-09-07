@@ -2,6 +2,8 @@
 
 [English](README.md) · 中文
 
+<p align="center"><img src="assets/logo.png" alt="mdbook" width="160"></p>
+
 把 Markdown 文件转换成带目录和页码的书籍版式 PDF。
 
 ## 特性
@@ -13,7 +15,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `mdbook-1.1-setup.exe`，双击安装，自带全部依赖，装完即用。
+推荐到 [Releases](../../releases) 下载 `mdbook-1.1.1-setup.exe`，双击安装，自带全部依赖，装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

@@ -68,6 +68,15 @@ async function handle(req, res) {
       return;
     }
 
+    if (req.method === 'GET' && u.pathname === '/icon.png') {
+      const icon = path.join(__dirname, 'icon.png');
+      if (fs.existsSync(icon)) {
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
+        res.end(fs.readFileSync(icon));
+        return;
+      }
+    }
+
     if (req.method === 'POST' && u.pathname === '/api/convert') {
       const b = await readBody(req);
       const files = (b.files || []).filter((f) => f && f.name);
