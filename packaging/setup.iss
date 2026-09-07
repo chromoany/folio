@@ -1,4 +1,4 @@
-; mdbook 1.1.1 —— Windows 安装脚本（Inno Setup 6）
+﻿; mdbook 1.1.1 —— Windows 安装脚本（Inno Setup 6）
 ; 更新点：
 ;   * 全新设计的软件图标 mdbook.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
 ;   * 桌面 + 开始菜单快捷方式改为安装时可勾选（默认勾选，符合常规软件）
