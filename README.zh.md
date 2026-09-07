@@ -11,11 +11,12 @@
 - 自动生成目录（含真实页码、可点击跳转）和页脚页码
 - Pandoc + Typst 引擎，公式、代码高亮、表格、列表原生支持
 - 单文件 / 多文件合并（每个一级标题自动另起一页）
+- 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
 - 完全离线运行
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `mdbook-1.1.1-setup.exe`，双击安装，自带全部依赖，装完即用。
+推荐到 [Releases](../../releases) 下载 `mdbook-1.2.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 
@@ -27,7 +28,7 @@ node scripts/setup.cjs   # 下载 pandoc / typst 到 vendor/
 
 ### 图形界面
 
-双击 `启动.vbs`，浏览器会自动打开本地页面：拖入 `.md` 文件 → 填书名等 → 点「开始转换」→ 下载 PDF。
+从开始菜单 / 桌面快捷方式（或运行 `mdbook.exe`）启动，独立窗口直接打开：拖入 `.md` 文件 → 填书名等 → 点「开始转换」→ 下载 PDF。
 
 ### 命令行
 

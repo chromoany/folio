@@ -11,11 +11,12 @@ Convert Markdown files into a book-style PDF with a table of contents and page n
 - Auto-generated table of contents (real page numbers, clickable) and page-numbered footer
 - Pandoc + Typst engine: math, syntax highlighting, tables, and lists work natively
 - Single file or merge multiple files (each H1 starts on a new page)
+- Standalone desktop app: bundled Chromium, no browser or Node.js needed
 - Fully offline
 
 ## Install
 
-Recommended: download `mdbook-1.1.1-setup.exe` from [Releases](../../releases), double-click to install — all dependencies bundled, ready to use.
+Recommended: download `mdbook-1.2.0-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
@@ -27,7 +28,7 @@ node scripts/setup.cjs   # download pandoc / typst into vendor/
 
 ### GUI
 
-Double-click `启动.vbs`; a browser opens a local page automatically: drop in `.md` files → fill in the title, etc. → click "Start" → download the PDF.
+Launch **mdbook** from the Start Menu / desktop shortcut (or run `mdbook.exe`); the standalone window opens: drop in `.md` files → fill in the title, etc. → click "Start" → download the PDF.
 
 ### CLI
 
