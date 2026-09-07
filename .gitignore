@@ -1,0 +1,5 @@
+.build/
+vendor/
+*.pdf
+node_modules/
+dist/

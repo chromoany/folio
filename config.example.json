@@ -1,0 +1,10 @@
+{
+  "title": "我的书",
+  "subtitle": "副标题（可留空）",
+  "inputs": ["examples/sample.md"],
+  "output": "book.pdf",
+  "toc": { "enabled": true, "title": "目录", "depth": 3 },
+  "chapterBreak": true,
+  "page": { "paper": "a4", "marginX": "20mm", "marginY": "18mm" },
+  "font": { "cjk": "Microsoft YaHei", "mono": "Consolas", "size": "10.5pt", "monoSize": "8pt" }
+}

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mdbook · Markdown → PDF</title>
+<style>
+  :root { --accent: #2f6feb; --bg: #f5f6f8; --card: #fff; --line: #e3e6ea; --txt: #1a1d21; --mut: #6b7280; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--txt); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header p { color: var(--mut); margin: 6px 0 0; font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .drop { border: 2px dashed #c3c9d2; border-radius: 10px; padding: 26px 16px; text-align: center; color: var(--mut); cursor: pointer; transition: .15s; }
+  .drop.drag { border-color: var(--accent); background: #f0f5ff; color: var(--accent); }
+  .drop b { color: var(--accent); }
+  #fileInput { display: none; }
+  .flist { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .fitem { display: flex; align-items: center; gap: 8px; background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+  .fitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fitem .idx { color: var(--mut); font-size: 12px; width: 20px; text-align: right; }
+  .fitem button { border: 0; background: #eef0f3; border-radius: 5px; cursor: pointer; padding: 3px 7px; font-size: 12px; color: #333; }
+  .fitem button:hover { background: #e0e4ea; }
+  .fitem button.del:hover { background: #fde2e2; color: #c0392b; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 12px; color: var(--mut); }
+  input[type=text], input[type=number], select { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; width: 100%; }
+  .checks { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
+  .checks label { display: flex; align-items: center; gap: 6px; color: var(--txt); }
+  .btn { border: 0; border-radius: 10px; padding: 13px 22px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn.primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn.primary:hover { background: #2457c7; }
+  .btn.primary:disabled { background: #a9c2f2; cursor: not-allowed; }
+  .btn.ghost { background: #eef0f3; color: #333; }
+  .btn.ghost:hover { background: #e0e4ea; }
+  .result { display: none; margin-top: 16px; border: 1px solid #cfe6cf; background: #f2faf3; border-radius: 10px; padding: 14px 16px; }
+  .result .ok { color: #1e7d32; font-weight: 600; margin-bottom: 8px; }
+  .result .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  #log { display: none; margin-top: 16px; background: #1e2430; color: #d6e2f5; border-radius: 10px; padding: 14px 16px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+  .hint { color: var(--mut); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>mdbook <span style="font-weight:400;color:var(--mut)">· Markdown → 书式 PDF</span></h1>
+    <p>生成带目录、真实页码、可点击跳转的 PDF；目录里能查到每一节的页码</p>
+  </header>
+
+  <div class="card">
+    <h2>① 选择 Markdown 文件（可多选，顺序即章节顺序）</h2>
+    <div class="drop" id="drop">把 <b>.md 文件拖到这里</b>，或点击选择</div>
+    <input type="file" id="fileInput" accept=".md,.markdown,.txt" multiple>
+    <div class="flist" id="flist"></div>
+  </div>
+
+  <div class="card">
+    <h2>② 选项</h2>
+    <div class="grid">
+      <div class="field"><label>书名</label><input type="text" id="title" placeholder="留空则不生成书名页"></div>
+      <div class="field"><label>副标题</label><input type="text" id="subtitle" placeholder="可选"></div>
+      <div class="field"><label>目录深度（列到几级标题）</label>
+        <select id="tocDepth">
+          <option value="1">1 级（仅章）</option>
+          <option value="2">2 级（章 + 节）</option>
+          <option value="3" selected>3 级（章 + 节 + 小节）</option>
+          <option value="4">4 级</option>
+        </select>
+      </div>
+      <div class="field"><label>输出 PDF 路径（留空则下载）</label><input type="text" id="output" placeholder="如 D:\...\书.pdf"></div>
+      <div class="field full">
+        <div class="checks">
+          <label><input type="checkbox" id="toc" checked> 生成目录</label>
+          <label><input type="checkbox" id="chapterBreak" checked> 每章（H1）另起一页</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>③ 转换</h2>
+    <button class="btn primary" id="go" disabled>开始转换</button>
+    <div class="hint" id="hint"></div>
+    <div class="result" id="result"></div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const drop = document.getElementById('drop');
+  const input = document.getElementById('fileInput');
+  const flist = document.getElementById('flist');
+  const go = document.getElementById('go');
+  const hint = document.getElementById('hint');
+  const result = document.getElementById('result');
+  const logEl = document.getElementById('log');
+
+  let files = [];
+
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault(); drop.classList.remove('drag');
+    addFiles([...e.dataTransfer.files]);
+  });
+  input.addEventListener('change', () => { addFiles([...input.files]); input.value = ''; });
+
+  function addFiles(arr) {
+    const md = arr.filter((f) => /\.(md|markdown|txt)$/i.test(f.name));
+    if (md.length) { files = files.concat(md); render(); }
+  }
+
+  function render() {
+    flist.innerHTML = '';
+    files.forEach((f, i) => {
+      const it = document.createElement('div');
+      it.className = 'fitem';
+      const idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = i + 1 + '.';
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.name;
+      const up = document.createElement('button'); up.textContent = '↑'; up.title = '上移';
+      const dn = document.createElement('button'); dn.textContent = '↓'; dn.title = '下移';
+      const del = document.createElement('button'); del.textContent = '×'; del.className = 'del'; del.title = '移除';
+      up.onclick = () => { if (i > 0) { [files[i - 1], files[i]] = [files[i], files[i - 1]]; render(); } };
+      dn.onclick = () => { if (i < files.length - 1) { [files[i + 1], files[i]] = [files[i], files[i + 1]]; render(); } };
+      del.onclick = () => { files.splice(i, 1); render(); };
+      it.append(idx, nm, up, dn, del);
+      flist.appendChild(it);
+    });
+    go.disabled = files.length === 0;
+    hint.textContent = files.length ? `已选 ${files.length} 个文件` : '';
+  }
+
+  go.addEventListener('click', async () => {
+    if (!files.length) return;
+    go.disabled = true;
+    result.style.display = 'none';
+    logEl.style.display = 'block';
+    logEl.textContent = '准备中…';
+    try {
+      const payload = {
+        files: await Promise.all(files.map(async (f) => ({ name: f.name, content: await f.text() }))),
+        title: document.getElementById('title').value.trim(),
+        subtitle: document.getElementById('subtitle').value.trim(),
+        tocDepth: Number(document.getElementById('tocDepth').value),
+        toc: document.getElementById('toc').checked,
+        chapterBreak: document.getElementById('chapterBreak').checked,
+        output: document.getElementById('output').value.trim() || null,
+      };
+      logEl.textContent = '上传并转换中…';
+      const r = await fetch('/api/convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || '转换失败');
+      logEl.textContent = (j.logs || []).join('\n');
+      renderResult(j);
+    } catch (e) {
+      logEl.textContent = '出错：' + (e.message || e);
+    } finally {
+      go.disabled = files.length === 0;
+    }
+  });
+
+  function renderResult(j) {
+    result.style.display = 'block';
+    result.innerHTML = '';
+    const ok = document.createElement('div'); ok.className = 'ok';
+    ok.textContent = '✓ 转换完成' + (j.savedTo ? '，已保存到 ' + j.savedTo : '（' + Math.round(j.size / 1024) + ' KB）');
+    result.appendChild(ok);
+    const actions = document.createElement('div'); actions.className = 'actions';
+
+    if (j.savedTo) {
+      const open = document.createElement('button'); open.className = 'btn ghost'; open.textContent = '打开 PDF';
+      open.onclick = () => fetch('/api/open?path=' + encodeURIComponent(j.savedTo));
+      const folder = document.createElement('button'); folder.className = 'btn ghost'; folder.textContent = '打开所在文件夹';
+      folder.onclick = () => fetch('/api/open?path=' + encodeURIComponent(j.savedTo.replace(/[\\/][^\\/]+$/, '')));
+      actions.append(open, folder);
+    }
+    const dl = document.createElement('button'); dl.className = 'btn ghost'; dl.textContent = '下载 PDF';
+    dl.onclick = () => { window.location.href = '/api/download?id=' + j.id; };
+    actions.appendChild(dl);
+    result.appendChild(actions);
+  }
+})();
+</script>
+</body>
+</html>
