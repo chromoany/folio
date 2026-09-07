@@ -12,11 +12,12 @@
 - Pandoc + Typst 引擎，公式、代码高亮、表格、列表原生支持
 - 单文件 / 多文件合并（每个一级标题自动另起一页）
 - 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
+- 最小化/关闭到系统托盘；启动自动检查更新
 - 完全离线运行
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `mdbook-1.2.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
+推荐到 [Releases](../../releases) 下载 `mdbook-1.3.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 
