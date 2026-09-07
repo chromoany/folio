@@ -22,7 +22,12 @@ node scripts/setup.cjs
 
 ## 下载（Windows 安装包）
 
-到 [Releases](../../releases) 下载 `mdbook-1.0-setup.exe`，双击安装：装到所选目录 + 开始菜单/桌面快捷方式 + 卸载。安装包自带 pandoc/typst 二进制，**装完即可离线使用**。
+到 [Releases](../../releases) 下载 `mdbook-1.1-setup.exe`，双击安装：
+
+- 装到所选目录，安装包自带 pandoc/typst 二进制，**装完即可离线使用**
+- 开始菜单 / 桌面快捷方式可在安装向导里**勾选**（默认勾选）；快捷方式用的是自带软件图标 `mdbook.ico`
+- 卸载：开始菜单「卸载 mdbook」，或在 Windows「设置 → 应用 → 已安装的应用」里对 mdbook 点「卸载」，或右键开始菜单里的 mdbook 图标选「卸载」
+- 本版本更新：新增软件图标、快捷方式改为可选、补充卸载入口（版本号 1.1）
 
 ## 图形界面（双击即用）
 
@@ -86,6 +91,11 @@ node bin/mdbook.cjs -c config.example.json
 - 验证目录页码：`node scripts/check-toc.cjs book.pdf`（解析 PDF 书签，打印每条标题对应页码）
 - 中间产物在 `.build/`（`body.typ` / `main.typ`），排查问题时可直接看
 - 若 md 里含旧方案的 `<a id>` / `<div style="page-break-*">` 等原始 HTML，Pandoc+Typst 会忽略，不影响输出
+
+## 打包与图标
+
+- 安装脚本：`packaging/setup.iss`（Inno Setup 6）。改动后用 ISCC 编译，如 `iscc packaging/setup.iss`，产物在 `dist/mdbook-1.1-setup.exe`。
+- 软件图标：`packaging/mdbook.ico`（多分辨率，由 `packaging/make-icon.ps1` 用 System.Drawing 生成）。改图标后运行 `powershell -NoProfile -ExecutionPolicy Bypass -File packaging/make-icon.ps1` 重新生成，预览图 `packaging/mdbook-256.png`。
 
 ## License
 

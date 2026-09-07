@@ -1,6 +1,10 @@
-; mdbook 1.0 —— Windows 安装脚本（Inno Setup 6）
+; mdbook 1.1 —— Windows 安装脚本（Inno Setup 6）
+; 更新点：
+;   * 新增软件图标 mdbook.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
+;   * 桌面 + 开始菜单快捷方式改为安装时可勾选（默认勾选，符合常规软件）
+;   * 开始菜单提供「卸载 mdbook」，并确保写入系统「应用」列表（可在设置/开始菜单右键卸载）
 #define MyAppName "mdbook"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.1"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/mdbook"
 
@@ -17,21 +21,35 @@ DefaultDirName={autopf}\mdbook
 DefaultGroupName=mdbook
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=mdbook-1.0-setup
+OutputBaseFilename=mdbook-1.1-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\启动.vbs
+SetupIconFile=mdbook.ico
+UninstallDisplayIcon={app}\mdbook.ico
+UninstallDisplayName=mdbook
+; 保证卸载信息写入 Windows「已安装的应用」列表，可在设置/开始菜单右键卸载
+UsePreviousAppDir=yes
+AppendDefaultDirName=no
+Uninstallable=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Tasks]
+; 快捷方式：默认勾选（像正常软件那样出现），用户可在安装向导里取消
+Name: "startmenu"; Description: "创建开始菜单快捷方式"; GroupDescription: "快捷方式:"
+Name: "desktopicon"; Description: "创建桌面图标"; GroupDescription: "快捷方式:"
+
 [Files]
 Source: "..\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".git\*,.build\*,dist\*,packaging\*"
+; 软件图标随安装复制，供快捷方式 / 卸载显示使用
+Source: "mdbook.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\mdbook"; Filename: "{app}\启动.vbs"; WorkingDir: "{app}"
-Name: "{autodesktop}\mdbook"; Filename: "{app}\启动.vbs"; WorkingDir: "{app}"
+Name: "{group}\mdbook"; Filename: "{app}\启动.vbs"; WorkingDir: "{app}"; IconFilename: "{app}\mdbook.ico"; Tasks: startmenu
+Name: "{group}\卸载 mdbook"; Filename: "{app}\unins000.exe"; Tasks: startmenu
+Name: "{autodesktop}\mdbook"; Filename: "{app}\启动.vbs"; WorkingDir: "{app}"; IconFilename: "{app}\mdbook.ico"; Tasks: desktopicon
 
 [Code]
 function IsNodeInstalled(): Boolean;
