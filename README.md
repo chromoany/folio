@@ -1,41 +1,41 @@
 # mdbook
 
-[English](README.en.md) · 中文
+[中文](README.zh.md) · English
 
-把 Markdown 文件转换成带目录和页码的书籍版式 PDF。
+Convert Markdown files into a book-style PDF with a table of contents and page numbers.
 
-## 特性
+## Features
 
-- 自动生成目录（含真实页码、可点击跳转）和页脚页码
-- Pandoc + Typst 引擎，公式、代码高亮、表格、列表原生支持
-- 单文件 / 多文件合并（每个一级标题自动另起一页）
-- 完全离线运行
+- Auto-generated table of contents (real page numbers, clickable) and page-numbered footer
+- Pandoc + Typst engine: math, syntax highlighting, tables, and lists work natively
+- Single file or merge multiple files (each H1 starts on a new page)
+- Fully offline
 
-## 安装
+## Install
 
-推荐到 [Releases](../../releases) 下载 `mdbook-1.1-setup.exe`，双击安装，自带全部依赖，装完即用。
+Recommended: download `mdbook-1.1-setup.exe` from [Releases](../../releases), double-click to install — all dependencies bundled, ready to use.
 
-从源码运行需要 [Node.js](https://nodejs.org/) v18+：
-
-```bash
-node scripts/setup.cjs   # 下载 pandoc / typst 到 vendor/
-```
-
-## 使用
-
-### 图形界面
-
-双击 `启动.vbs`，浏览器会自动打开本地页面：拖入 `.md` 文件 → 填书名等 → 点「开始转换」→ 下载 PDF。
-
-### 命令行
+To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
 ```bash
-node bin/mdbook.cjs 书.md -o 书.pdf --title "我的书"
-node bin/mdbook.cjs 第1章.md 第2章.md -o 书.pdf   # 多文件合并
-node bin/mdbook.cjs -c config.example.json        # 用配置文件
+node scripts/setup.cjs   # download pandoc / typst into vendor/
 ```
 
-常用参数：`--title` / `--subtitle` 书名副标题，`--toc-depth N` 目录深度，`--no-toc` 不生成目录，`--no-chapter-break` 一级标题不另起页，`--pandoc-bin` / `--typst-bin` 指定二进制路径。完整配置见 `config.example.json`。
+## Usage
+
+### GUI
+
+Double-click `启动.vbs`; a browser opens a local page automatically: drop in `.md` files → fill in the title, etc. → click "Start" → download the PDF.
+
+### CLI
+
+```bash
+node bin/mdbook.cjs book.md -o book.pdf --title "My Book"
+node bin/mdbook.cjs ch1.md ch2.md -o book.pdf      # merge multiple files
+node bin/mdbook.cjs -c config.example.json         # use a config file
+```
+
+Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
 
 ## License
 
