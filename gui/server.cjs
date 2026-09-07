@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn, execSync } = require('child_process');
 const { build } = require('../bin/mdbook.cjs');
+const settings = require('../desktop/settings.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const RUNS = path.join(ROOT, '.build', 'gui-runs');
@@ -75,6 +76,24 @@ async function handle(req, res) {
         res.end(fs.readFileSync(icon));
         return;
       }
+    }
+
+    if (req.method === 'GET' && u.pathname === '/api/settings') {
+      sendJson(res, 200, { ok: true, settings: settings.load() });
+      return;
+    }
+
+    if (req.method === 'POST' && u.pathname === '/api/settings') {
+      const b = await readBody(req);
+      if (b.closeBehavior !== undefined) {
+        if (['tray', 'quit'].includes(b.closeBehavior)) {
+          settings.set('closeBehavior', b.closeBehavior);
+        } else {
+          throw new Error('无效的关闭行为设置');
+        }
+      }
+      sendJson(res, 200, { ok: true, settings: settings.load() });
+      return;
     }
 
     if (req.method === 'POST' && u.pathname === '/api/convert') {

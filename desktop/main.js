@@ -3,12 +3,13 @@
  * mdbook 桌面版入口（Electron 主进程）
  * 复用 gui/server.cjs 作为本地服务，再用独立窗口加载 127.0.0.1:4680。
  * 打包后自带 Chromium 内核，不依赖系统浏览器。
- * 特性：最小化/关闭 → 托盘；启动自动检查更新。
+ * 行为：最小化 → 任务栏；关闭 → 首次询问（托盘 / 退出），之后按设置执行。
  */
 const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell } = require('electron');
 const http = require('http');
 const https = require('https');
 const path = require('path');
+const settings = require('./settings');
 
 const PORT = Number(process.env.MDBOOK_GUI_PORT || 4680);
 const URL = `http://127.0.0.1:${PORT}`;
@@ -51,19 +52,37 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadURL(URL);
 
-  // 最小化 → 隐藏到托盘（不占任务栏）
-  mainWindow.on('minimize', (event) => {
-    event.preventDefault();
-    mainWindow.hide();
-  });
-  // 关闭 → 隐藏到托盘（后台常驻）；只有托盘菜单「退出」才真正退出
+  // 关闭：首次询问，之后按设置（托盘 / 退出）
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
+    if (isQuitting) return; // 真正退出，放行
+    event.preventDefault();
+    handleClose();
   });
   mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+async function handleClose() {
+  let behavior = settings.get('closeBehavior');
+  if (!behavior) {
+    const r = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      title: '关闭窗口',
+      message: '关闭窗口时，你希望怎样处理？',
+      detail: '之后可随时在界面「设置」里更改。',
+      buttons: ['收起至系统托盘（后台继续运行）', '直接退出程序'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    behavior = r.response === 0 ? 'tray' : 'quit';
+    settings.set('closeBehavior', behavior);
+  }
+  if (behavior === 'tray') {
+    mainWindow.hide();
+  } else {
+    isQuitting = true;
+    app.quit();
+  }
 }
 
 function createTray() {

@@ -89,6 +89,18 @@
     <div class="result" id="result"></div>
     <div id="log"></div>
   </div>
+
+  <div class="card">
+    <h2>④ 设置</h2>
+    <div class="field">
+      <label>关闭窗口时</label>
+      <select id="closeBehavior">
+        <option value="tray">收起至系统托盘（后台继续运行）</option>
+        <option value="quit">直接退出程序</option>
+      </select>
+    </div>
+    <div class="hint">仅桌面版生效：点窗口右上角「×」时按此处理；最小化仍进任务栏。</div>
+  </div>
 </div>
 
 <script>
@@ -186,6 +198,25 @@
     actions.appendChild(dl);
     result.appendChild(actions);
   }
+
+  // ---- 设置：关闭窗口行为 ----
+  const closeBehaviorSel = document.getElementById('closeBehavior');
+  (async () => {
+    try {
+      const r = await fetch('/api/settings');
+      const j = await r.json();
+      if (j.ok && j.settings && j.settings.closeBehavior) {
+        closeBehaviorSel.value = j.settings.closeBehavior;
+      }
+    } catch (_) {}
+  })();
+  closeBehaviorSel.addEventListener('change', () => {
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ closeBehavior: closeBehaviorSel.value }),
+    }).catch(() => {});
+  });
 })();
 </script>
 </body>
