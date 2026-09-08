@@ -4,12 +4,15 @@
  * 复用 gui/server.cjs 作为本地服务，再用独立窗口加载 127.0.0.1:4680。
  * 打包后自带 Chromium 内核，不依赖系统浏览器。
  * 行为：最小化 → 任务栏；关闭 → 首次询问（托盘 / 退出），之后按设置执行。
+ * 语言：托盘菜单与系统弹窗文案跟随界面语言（settings.language），
+ *       界面内切换语言后经 preload 通知本进程即时重建托盘菜单。
  */
-const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell, ipcMain } = require('electron');
 const http = require('http');
 const https = require('https');
 const path = require('path');
 const settings = require('./settings');
+const { t } = require('./i18n');
 
 const PORT = Number(process.env.FOLIO_GUI_PORT || 4680);
 const URL = `http://127.0.0.1:${PORT}`;
@@ -47,6 +50,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
   mainWindow.setMenuBarVisibility(false);
@@ -66,10 +70,10 @@ async function handleClose() {
   if (!behavior) {
     const r = await dialog.showMessageBox(mainWindow, {
       type: 'question',
-      title: '关闭窗口',
-      message: '关闭窗口时，你希望怎样处理？',
-      detail: '之后可随时在界面「设置」里更改。',
-      buttons: ['收起至系统托盘（后台继续运行）', '直接退出程序'],
+      title: t('closeTitle'),
+      message: t('closeMsg'),
+      detail: t('closeDetail'),
+      buttons: [t('trayBtn'), t('quitBtn')],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
@@ -85,21 +89,35 @@ async function handleClose() {
   }
 }
 
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: t('trayOpen'), click: showWindow },
+    { label: t('trayUpdate'), click: () => checkForUpdates(true) },
+    { type: 'separator' },
+    { label: t('trayQuit'), click: () => { isQuitting = true; app.quit(); } },
+  ]);
+}
+
 function createTray() {
   const iconPath = path.join(path.dirname(process.execPath), 'folio.ico');
   let icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) icon = nativeImage.createEmpty();
   tray = new Tray(icon);
   tray.setToolTip('Folio');
-  const menu = Menu.buildFromTemplate([
-    { label: '打开 Folio', click: showWindow },
-    { label: '检查更新', click: () => checkForUpdates(true) },
-    { type: 'separator' },
-    { label: '退出', click: () => { isQuitting = true; app.quit(); } },
-  ]);
-  tray.setContextMenu(menu);
+  rebuildTrayMenu();
   tray.on('click', showWindow);
 }
+
+// 按当前界面语言重建托盘菜单（语言切换时调用）
+function rebuildTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(buildTrayMenu());
+}
+
+// 界面里切换语言后，主进程同步重建托盘菜单文案
+ipcMain.on('folio:set-language', () => {
+  rebuildTrayMenu();
+});
 
 // ---- 自动更新检查 ----
 
@@ -127,7 +145,7 @@ function httpsGetJson(url) {
       });
     });
     req.on('error', reject);
-    req.setTimeout(8000, () => req.destroy(new Error('请求超时')));
+    req.setTimeout(8000, () => req.destroy(new Error('timeout')));
   });
 }
 
@@ -139,20 +157,20 @@ async function checkForUpdates(manual) {
     if (compareVersions(latest, current) > 0) {
       const r = await dialog.showMessageBox(mainWindow, {
         type: 'info',
-        title: '发现新版本',
-        message: `Folio 有新版本 v${latest}（当前 v${current}）`,
-        detail: '是否前往 GitHub 下载最新版？',
-        buttons: ['前往下载', '稍后再说'],
+        title: t('updateTitle'),
+        message: t('updateMsg', latest, current),
+        detail: t('updateDetail'),
+        buttons: [t('goDownload'), t('later')],
         defaultId: 0,
         cancelId: 1,
       });
       if (r.response === 0) shell.openExternal(RELEASE_PAGE);
     } else if (manual) {
-      await dialog.showMessageBox(mainWindow, { type: 'info', title: '检查更新', message: `已是最新版本 v${current}` });
+      await dialog.showMessageBox(mainWindow, { type: 'info', title: t('checkTitle'), message: t('upToDate', current) });
     }
   } catch (e) {
     if (manual) {
-      await dialog.showMessageBox(mainWindow, { type: 'warning', title: '检查更新', message: '检查更新失败：' + (e.message || e) });
+      await dialog.showMessageBox(mainWindow, { type: 'warning', title: t('checkTitle'), message: t('checkFailed') + (e.message || e) });
     }
     // 非手动：静默失败，不打扰用户
   }
@@ -180,9 +198,9 @@ app.whenReady().then(() => {
       const name = item.getFilename();
       dialog
         .showSaveDialog(mainWindow, {
-          title: '保存 PDF',
+          title: t('savePdfTitle'),
           defaultPath: name,
-          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+          filters: [{ name: t('pdfFilter'), extensions: ['pdf'] }],
         })
         .then((r) => {
           if (r.canceled || !r.filePath) item.cancel();
@@ -194,7 +212,7 @@ app.whenReady().then(() => {
   try {
     require('../gui/server.cjs'); // 启动本地服务（FOLIO_GUI_NO_OPEN 已设，不会开浏览器）
   } catch (e) {
-    dialog.showErrorBox('Folio 启动失败', String((e && e.stack) || e));
+    dialog.showErrorBox(t('startupFailTitle'), String((e && e.stack) || e));
     app.quit();
     return;
   }

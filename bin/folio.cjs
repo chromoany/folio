@@ -19,6 +19,40 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const TMP = process.env.FOLIO_TMP || path.join(ROOT, '.build');
 
+// 界面语言（zh/en）：GUI 经 cfg.lang 传入，CLI 默认中文；转换日志与错误提示随语言切换
+let UI_LANG = 'zh';
+
+const MSG = {
+  zh: {
+    noInput: '没有输入文件',
+    nFiles: (n, out) => `输入 ${n} 个文件 → ${out}`,
+    step1: '① pandoc：Markdown → Typst …',
+    step2: '② 注入书版式模板 …',
+    step3: '③ typst：排版出 PDF（目录页码自动回填）…',
+    done: (p, k) => `完成：${p}（${k} KB）`,
+    notFound: (label, cmd) => `找不到 ${label}（${cmd}）。请先运行 scripts\\setup.cjs，或用 --${label}-bin 指定路径`,
+    runErr: (label, msg) => `${label} 执行出错：${msg}`,
+    failed: (label, status, tail) => `${label} 执行失败（退出码 ${status}）${tail ? '\n' + tail : ''}`,
+  },
+  en: {
+    noInput: 'No input files',
+    nFiles: (n, out) => `Input ${n} file(s) → ${out}`,
+    step1: '① pandoc: Markdown → Typst …',
+    step2: '② Inject book layout template …',
+    step3: '③ typst: typeset the PDF (TOC page numbers are backfilled) …',
+    done: (p, k) => `Done: ${p} (${k} KB)`,
+    notFound: (label, cmd) => `Cannot find ${label} (${cmd}). Run scripts\\setup.cjs first, or use --${label}-bin`,
+    runErr: (label, msg) => `${label} failed to run: ${msg}`,
+    failed: (label, status, tail) => `${label} failed (exit code ${status})${tail ? '\n' + tail : ''}`,
+  },
+};
+
+function T(key, ...args) {
+  const m = MSG[UI_LANG] || MSG.zh;
+  const v = m[key];
+  return typeof v === 'function' ? v(...args) : v;
+}
+
 const DEFAULTS = {
   inputs: [],
   output: null,
@@ -202,20 +236,21 @@ function run(cmd, args, cwd, label) {
   }
   if (r.error) {
     if (r.error.code === 'ENOENT') {
-      throw new Error(`找不到 ${label}（${cmd}）。请先运行 scripts\\setup.cjs，或用 --${label}-bin 指定路径`);
+      throw new Error(T('notFound', label, cmd));
     }
-    throw new Error(`${label} 执行出错：${r.error.message}`);
+    throw new Error(T('runErr', label, r.error.message));
   }
   if (r.status !== 0) {
     const err = String(r.stderr || '').trim();
     const tail = err ? err.split('\n').slice(-20).join('\n') : '';
-    throw new Error(`${label} 执行失败（退出码 ${r.status}）${tail ? '\n' + tail : ''}`);
+    throw new Error(T('failed', label, r.status, tail));
   }
 }
 
 /** 执行完整转换。cfg 见 DEFAULTS，可额外带 pandocBin / typstBin。返回 { output, size, runDir } */
 function build(cfg, { log = () => {} } = {}) {
-  if (!cfg.inputs || !cfg.inputs.length) throw new Error('没有输入文件');
+  UI_LANG = (cfg && cfg.lang === 'en') ? 'en' : 'zh';
+  if (!cfg.inputs || !cfg.inputs.length) throw new Error(T('noInput'));
   if (!cfg.output) cfg.output = cfg.inputs[0].replace(/\.md$/i, '') + '.pdf';
 
   const pandocBin = findBin('pandoc', cfg.pandocBin);
@@ -237,18 +272,18 @@ function build(cfg, { log = () => {} } = {}) {
     return tmp;
   });
 
-  log(`输入 ${cfg.inputs.length} 个文件 → ${outAbs}`);
-  log('① pandoc：Markdown → Typst …');
+  log(T('nFiles', cfg.inputs.length, outAbs));
+  log(T('step1'));
   run(pandocBin, ['-f', 'markdown+tex_math_dollars', '-t', 'typst', '--wrap=none', '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))], ROOT, 'pandoc');
 
-  log('② 注入书版式模板 …');
+  log(T('step2'));
   fs.writeFileSync(mainFile, renderTemplate(cfg), 'utf8');
 
-  log('③ typst：排版出 PDF（目录页码自动回填）…');
+  log(T('step3'));
   run(typstBin, ['compile', mainFile, outAbs], runDir, 'typst');
 
   const size = fs.statSync(outAbs).size;
-  log(`完成：${outAbs}（${Math.round(size / 1024)} KB）`);
+  log(T('done', outAbs, Math.round(size / 1024)));
   return { output: outAbs, size, runDir };
 }
 

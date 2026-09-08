@@ -12,6 +12,7 @@
 - Pandoc + Typst 引擎，公式、代码高亮、表格、列表原生支持
 - 单文件 / 多文件合并（每个一级标题自动另起一页）
 - 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
+- 双语界面（简体中文 / English）：安装时可选语言，随时可在「设置」里切换
 - 关闭窗口行为可配置（托盘 / 退出）；启动自动检查更新
 - 完全离线运行
 
@@ -34,7 +35,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `folio-1.4.1-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
+推荐到 [Releases](../../releases) 下载 `folio-1.5.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

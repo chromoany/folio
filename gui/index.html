@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -55,51 +55,52 @@
   .modal-head b { font-size: 16px; }
   .modal-close { border: 0; background: #eef0f3; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; color: #555; }
   .modal-close:hover { background: #e0e4ea; }
+  .modal .field + .field { margin-top: 12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Folio <span style="font-weight:400;color:var(--mut)">· Markdown → 书式 PDF</span></h1>
-    <p>生成带目录、真实页码、可点击跳转的 PDF；目录里能查到每一节的页码</p>
-    <button class="gear" id="settingsBtn" title="设置" aria-label="设置">
+    <h1>Folio <span style="font-weight:400;color:var(--mut)" data-i18n="tagline">· Markdown → 书式 PDF</span></h1>
+    <p data-i18n="intro">生成带目录、真实页码、可点击跳转的 PDF；目录里能查到每一节的页码</p>
+    <button class="gear" id="settingsBtn" data-i18n-title="settingsBtn" title="设置" aria-label="设置">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
   </header>
 
   <div class="card">
-    <h2>① 选择 Markdown 文件（可多选，顺序即章节顺序）</h2>
-    <div class="drop" id="drop">把 <b>.md 文件拖到这里</b>，或点击选择</div>
+    <h2 data-i18n="step1Card">① 选择 Markdown 文件（可多选，顺序即章节顺序）</h2>
+    <div class="drop" id="drop" data-i18n-html="dropHtml">把 <b>.md 文件拖到这里</b>，或点击选择</div>
     <input type="file" id="fileInput" accept=".md,.markdown,.txt" multiple>
     <div class="flist" id="flist"></div>
   </div>
 
   <div class="card">
-    <h2>② 选项</h2>
+    <h2 data-i18n="step2Card">② 选项</h2>
     <div class="grid">
-      <div class="field"><label>书名</label><input type="text" id="title" placeholder="留空则不生成书名页"></div>
-      <div class="field"><label>副标题</label><input type="text" id="subtitle" placeholder="可选"></div>
-      <div class="field"><label>目录深度（列到几级标题）</label>
+      <div class="field"><label data-i18n="lblTitle">书名</label><input type="text" id="title" data-i18n-ph="phTitle" placeholder="留空则不生成书名页"></div>
+      <div class="field"><label data-i18n="lblSubtitle">副标题</label><input type="text" id="subtitle" data-i18n-ph="phSubtitle" placeholder="可选"></div>
+      <div class="field"><label data-i18n="lblTocDepth">目录深度（列到几级标题）</label>
         <select id="tocDepth">
-          <option value="1">1 级（仅章）</option>
-          <option value="2">2 级（章 + 节）</option>
-          <option value="3" selected>3 级（章 + 节 + 小节）</option>
-          <option value="4">4 级</option>
+          <option value="1" data-i18n="toc1">1 级（仅章）</option>
+          <option value="2" data-i18n="toc2">2 级（章 + 节）</option>
+          <option value="3" selected data-i18n="toc3">3 级（章 + 节 + 小节）</option>
+          <option value="4" data-i18n="toc4">4 级</option>
         </select>
       </div>
-      <div class="field"><label>输出 PDF 路径（留空则下载）</label><input type="text" id="output" placeholder="如 D:\...\书.pdf"></div>
+      <div class="field"><label data-i18n="lblOutput">输出 PDF 路径（留空则下载）</label><input type="text" id="output" data-i18n-ph="phOutput" placeholder="如 D:\...\书.pdf"></div>
       <div class="field full">
         <div class="checks">
-          <label><input type="checkbox" id="toc" checked> 生成目录</label>
-          <label><input type="checkbox" id="chapterBreak" checked> 每章（H1）另起一页</label>
+          <label><input type="checkbox" id="toc" checked> <span data-i18n="chkToc">生成目录</span></label>
+          <label><input type="checkbox" id="chapterBreak" checked> <span data-i18n="chkBreak">每章（H1）另起一页</span></label>
         </div>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>③ 转换</h2>
-    <button class="btn primary" id="go" disabled>开始转换</button>
+    <h2 data-i18n="step3Card">③ 转换</h2>
+    <button class="btn primary" id="go" data-i18n="goBtn" disabled>开始转换</button>
     <div class="hint" id="hint"></div>
     <div class="result" id="result"></div>
     <div id="log"></div>
@@ -108,23 +109,149 @@
   <div class="modal-mask" id="settingsMask">
     <div class="modal">
       <div class="modal-head">
-        <b>设置</b>
-        <button class="modal-close" id="settingsClose" title="关闭">×</button>
+        <b data-i18n="settingsTitle">设置</b>
+        <button class="modal-close" id="settingsClose" data-i18n-title="closeBtnTitle" title="关闭">×</button>
       </div>
       <div class="field">
-        <label>关闭窗口时</label>
+        <label data-i18n="lblClose">关闭窗口时</label>
         <select id="closeBehavior">
-          <option value="tray">收起至系统托盘（后台继续运行）</option>
-          <option value="quit">直接退出程序</option>
+          <option value="tray" data-i18n="optTray">收起至系统托盘（后台继续运行）</option>
+          <option value="quit" data-i18n="optQuit">直接退出程序</option>
         </select>
+        <div class="hint" data-i18n="closeHint">仅桌面版生效：点窗口右上角「×」时按此处理；最小化仍进任务栏。</div>
       </div>
-      <div class="hint">仅桌面版生效：点窗口右上角「×」时按此处理；最小化仍进任务栏。</div>
+      <div class="field">
+        <label data-i18n="lblLang">语言</label>
+        <select id="languageSel">
+          <option value="zh" data-i18n="optZh">中文</option>
+          <option value="en" data-i18n="optEn">English</option>
+        </select>
+        <div class="hint" data-i18n="langHint">语言即时生效，托盘菜单与系统弹窗同步切换。</div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
 (function () {
+  const LANGS = {
+    zh: {
+      docTitle: 'Folio · Markdown → PDF',
+      tagline: '· Markdown → 书式 PDF',
+      intro: '生成带目录、真实页码、可点击跳转的 PDF；目录里能查到每一节的页码',
+      settingsBtn: '设置',
+      settingsTitle: '设置',
+      closeBtnTitle: '关闭',
+      step1Card: '① 选择 Markdown 文件（可多选，顺序即章节顺序）',
+      dropHtml: '把 <b>.md 文件拖到这里</b>，或点击选择',
+      step2Card: '② 选项',
+      lblTitle: '书名',
+      phTitle: '留空则不生成书名页',
+      lblSubtitle: '副标题',
+      phSubtitle: '可选',
+      lblTocDepth: '目录深度（列到几级标题）',
+      toc1: '1 级（仅章）',
+      toc2: '2 级（章 + 节）',
+      toc3: '3 级（章 + 节 + 小节）',
+      toc4: '4 级',
+      lblOutput: '输出 PDF 路径（留空则下载）',
+      phOutput: '如 D:\\...\\书.pdf',
+      chkToc: '生成目录',
+      chkBreak: '每章（H1）另起一页',
+      step3Card: '③ 转换',
+      goBtn: '开始转换',
+      lblClose: '关闭窗口时',
+      optTray: '收起至系统托盘（后台继续运行）',
+      optQuit: '直接退出程序',
+      closeHint: '仅桌面版生效：点窗口右上角「×」时按此处理；最小化仍进任务栏。',
+      lblLang: '语言',
+      optZh: '中文',
+      optEn: 'English',
+      langHint: '语言即时生效，托盘菜单与系统弹窗同步切换。',
+      up: '上移',
+      down: '下移',
+      del: '移除',
+      filesSelected: (n) => (n ? `已选 ${n} 个文件` : ''),
+      preparing: '准备中…',
+      uploading: '上传并转换中…',
+      convFail: '转换失败',
+      errPrefix: '出错：',
+      okSaved: (p) => `✓ 转换完成，已保存到 ${p}`,
+      okSize: (k) => `✓ 转换完成（${k} KB）`,
+      openPdf: '打开 PDF',
+      openFolder: '打开所在文件夹',
+      downloadPdf: '下载 PDF',
+    },
+    en: {
+      docTitle: 'Folio · Markdown → PDF',
+      tagline: '· Markdown → Book PDF',
+      intro: 'Create a PDF with a clickable table of contents and real page numbers',
+      settingsBtn: 'Settings',
+      settingsTitle: 'Settings',
+      closeBtnTitle: 'Close',
+      step1Card: '① Select Markdown files (multi-select — order = chapter order)',
+      dropHtml: 'Drag &amp; drop <b>.md files here</b>, or click to select',
+      step2Card: '② Options',
+      lblTitle: 'Book title',
+      phTitle: 'Leave empty to skip the title page',
+      lblSubtitle: 'Subtitle',
+      phSubtitle: 'Optional',
+      lblTocDepth: 'TOC depth (levels to list)',
+      toc1: 'Level 1 (chapters only)',
+      toc2: 'Level 2 (chapters + sections)',
+      toc3: 'Level 3 (chapters + sections + subsections)',
+      toc4: 'Level 4',
+      lblOutput: 'Output PDF path (leave empty to download)',
+      phOutput: 'e.g. D:\\...\\book.pdf',
+      chkToc: 'Table of contents',
+      chkBreak: 'Each chapter (H1) starts a new page',
+      step3Card: '③ Convert',
+      goBtn: 'Convert',
+      lblClose: 'When closing the window',
+      optTray: 'Minimize to tray (keep running in background)',
+      optQuit: 'Quit the app',
+      closeHint: 'Desktop only: applies when clicking the “×” button; minimizing still goes to the taskbar.',
+      lblLang: 'Language',
+      optZh: '中文',
+      optEn: 'English',
+      langHint: 'Applies immediately — tray menu and system dialogs switch too.',
+      up: 'Move up',
+      down: 'Move down',
+      del: 'Remove',
+      filesSelected: (n) => (n ? `${n} file(s) selected` : ''),
+      preparing: 'Preparing…',
+      uploading: 'Uploading and converting…',
+      convFail: 'Conversion failed',
+      errPrefix: 'Error: ',
+      okSaved: (p) => `✓ Conversion complete — saved to ${p}`,
+      okSize: (k) => `✓ Conversion complete (${k} KB)`,
+      openPdf: 'Open PDF',
+      openFolder: 'Open containing folder',
+      downloadPdf: 'Download PDF',
+    },
+  };
+
+  let cur = 'zh';
+
+  function t(key, ...args) {
+    const v = (LANGS[cur] || LANGS.zh)[key];
+    return typeof v === 'function' ? v(...args) : (v !== undefined ? v : key);
+  }
+
+  // 应用语言到所有带 data-i18n* 的静态元素
+  function applyLang(lang) {
+    cur = lang === 'en' ? 'en' : 'zh';
+    document.documentElement.lang = cur === 'zh' ? 'zh-CN' : 'en';
+    document.title = t('docTitle');
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+    document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+    document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+    const langSel = document.getElementById('languageSel');
+    if (langSel) langSel.value = cur;
+    renderList();
+  }
+
   const drop = document.getElementById('drop');
   const input = document.getElementById('fileInput');
   const flist = document.getElementById('flist');
@@ -146,27 +273,27 @@
 
   function addFiles(arr) {
     const md = arr.filter((f) => /\.(md|markdown|txt)$/i.test(f.name));
-    if (md.length) { files = files.concat(md); render(); }
+    if (md.length) { files = files.concat(md); renderList(); }
   }
 
-  function render() {
+  function renderList() {
     flist.innerHTML = '';
     files.forEach((f, i) => {
       const it = document.createElement('div');
       it.className = 'fitem';
       const idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = i + 1 + '.';
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.name;
-      const up = document.createElement('button'); up.textContent = '↑'; up.title = '上移';
-      const dn = document.createElement('button'); dn.textContent = '↓'; dn.title = '下移';
-      const del = document.createElement('button'); del.textContent = '×'; del.className = 'del'; del.title = '移除';
-      up.onclick = () => { if (i > 0) { [files[i - 1], files[i]] = [files[i], files[i - 1]]; render(); } };
-      dn.onclick = () => { if (i < files.length - 1) { [files[i + 1], files[i]] = [files[i], files[i + 1]]; render(); } };
-      del.onclick = () => { files.splice(i, 1); render(); };
+      const up = document.createElement('button'); up.textContent = '↑'; up.title = t('up');
+      const dn = document.createElement('button'); dn.textContent = '↓'; dn.title = t('down');
+      const del = document.createElement('button'); del.textContent = '×'; del.className = 'del'; del.title = t('del');
+      up.onclick = () => { if (i > 0) { [files[i - 1], files[i]] = [files[i], files[i - 1]]; renderList(); } };
+      dn.onclick = () => { if (i < files.length - 1) { [files[i + 1], files[i]] = [files[i], files[i + 1]]; renderList(); } };
+      del.onclick = () => { files.splice(i, 1); renderList(); };
       it.append(idx, nm, up, dn, del);
       flist.appendChild(it);
     });
     go.disabled = files.length === 0;
-    hint.textContent = files.length ? `已选 ${files.length} 个文件` : '';
+    hint.textContent = t('filesSelected', files.length);
   }
 
   go.addEventListener('click', async () => {
@@ -174,7 +301,7 @@
     go.disabled = true;
     result.style.display = 'none';
     logEl.style.display = 'block';
-    logEl.textContent = '准备中…';
+    logEl.textContent = t('preparing');
     try {
       const payload = {
         files: await Promise.all(files.map(async (f) => ({ name: f.name, content: await f.text() }))),
@@ -185,14 +312,14 @@
         chapterBreak: document.getElementById('chapterBreak').checked,
         output: document.getElementById('output').value.trim() || null,
       };
-      logEl.textContent = '上传并转换中…';
+      logEl.textContent = t('uploading');
       const r = await fetch('/api/convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const j = await r.json();
-      if (!j.ok) throw new Error(j.error || '转换失败');
+      if (!j.ok) throw new Error(j.error || t('convFail'));
       logEl.textContent = (j.logs || []).join('\n');
       renderResult(j);
     } catch (e) {
-      logEl.textContent = '出错：' + (e.message || e);
+      logEl.textContent = t('errPrefix') + (e.message || e);
     } finally {
       go.disabled = files.length === 0;
     }
@@ -202,50 +329,70 @@
     result.style.display = 'block';
     result.innerHTML = '';
     const ok = document.createElement('div'); ok.className = 'ok';
-    ok.textContent = '✓ 转换完成' + (j.savedTo ? '，已保存到 ' + j.savedTo : '（' + Math.round(j.size / 1024) + ' KB）');
+    ok.textContent = j.savedTo ? t('okSaved', j.savedTo) : t('okSize', Math.round(j.size / 1024));
     result.appendChild(ok);
     const actions = document.createElement('div'); actions.className = 'actions';
 
     if (j.savedTo) {
-      const open = document.createElement('button'); open.className = 'btn ghost'; open.textContent = '打开 PDF';
+      const open = document.createElement('button'); open.className = 'btn ghost'; open.textContent = t('openPdf');
       open.onclick = () => fetch('/api/open?path=' + encodeURIComponent(j.savedTo));
-      const folder = document.createElement('button'); folder.className = 'btn ghost'; folder.textContent = '打开所在文件夹';
+      const folder = document.createElement('button'); folder.className = 'btn ghost'; folder.textContent = t('openFolder');
       folder.onclick = () => fetch('/api/open?path=' + encodeURIComponent(j.savedTo.replace(/[\\/][^\\/]+$/, '')));
       actions.append(open, folder);
     }
-    const dl = document.createElement('button'); dl.className = 'btn ghost'; dl.textContent = '下载 PDF';
+    const dl = document.createElement('button'); dl.className = 'btn ghost'; dl.textContent = t('downloadPdf');
     dl.onclick = () => { window.location.href = '/api/download?id=' + j.id; };
     actions.appendChild(dl);
     result.appendChild(actions);
   }
 
-  // ---- 设置：关闭窗口行为 ----
-  const closeBehaviorSel = document.getElementById('closeBehavior');
-  (async () => {
-    try {
-      const r = await fetch('/api/settings');
-      const j = await r.json();
-      if (j.ok && j.settings && j.settings.closeBehavior) {
-        closeBehaviorSel.value = j.settings.closeBehavior;
-      }
-    } catch (_) {}
-  })();
-  closeBehaviorSel.addEventListener('change', () => {
-    fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ closeBehavior: closeBehaviorSel.value }),
-    }).catch(() => {});
-  });
-
-  // ---- 设置弹窗：右上角角标打开 / 关闭 ----
+  // ---- 设置弹窗 ----
   const settingsMask = document.getElementById('settingsMask');
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsClose = document.getElementById('settingsClose');
+  const closeBehaviorSel = document.getElementById('closeBehavior');
+  const langSel = document.getElementById('languageSel');
+
   settingsBtn.addEventListener('click', () => settingsMask.classList.add('open'));
   settingsClose.addEventListener('click', () => settingsMask.classList.remove('open'));
   settingsMask.addEventListener('click', (e) => { if (e.target === settingsMask) settingsMask.classList.remove('open'); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && settingsMask.classList.contains('open')) settingsMask.classList.remove('open'); });
+
+  function postSettings(patch) {
+    return fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => {});
+  }
+
+  closeBehaviorSel.addEventListener('change', () => {
+    postSettings({ closeBehavior: closeBehaviorSel.value });
+  });
+
+  langSel.addEventListener('change', async () => {
+    const v = langSel.value === 'en' ? 'en' : 'zh';
+    await postSettings({ language: v });
+    applyLang(v);
+    if (window.folio && window.folio.setLanguage) window.folio.setLanguage(v);
+  });
+
+  // ---- 初始化：读取设置（语言 + 关闭行为），再应用文案 ----
+  (async () => {
+    try {
+      const r = await fetch('/api/settings');
+      const j = await r.json();
+      if (j.ok && j.settings) {
+        if (j.settings.closeBehavior === 'tray' || j.settings.closeBehavior === 'quit') {
+          closeBehaviorSel.value = j.settings.closeBehavior;
+        }
+        if (j.settings.language === 'en' || j.settings.language === 'zh') {
+          cur = j.settings.language;
+        }
+      }
+    } catch (_) {}
+    applyLang(cur);
+  })();
 })();
 </script>
 </body>
