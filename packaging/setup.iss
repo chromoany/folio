@@ -1,4 +1,6 @@
-; Folio 1.6.0 —— Windows 安装脚本（Inno Setup 6）
+; Folio 1.6.1 —— Windows 安装脚本（Inno Setup 6）
+; v1.6.1 更新点：
+;   * 修复：点击「下载 PDF」会连续弹出两个「另存为」对话框的问题
 ; v1.6.0 更新点：
 ;   * 安装体积精简：Electron locales 仅保留中英语言包；pandoc/typst 引擎经 UPX 压缩
 ;     （运行时自解压，转换功能与输出完全不变）
@@ -10,7 +12,7 @@
 ;   * （继承 1.4.1）关闭行为可配置、托盘、自动检查更新、独立桌面版、图标、快捷方式可选、始终可选安装目录
 ; 注：AppId 保持与旧版（mdbook/Folio）一致，便于从旧版平滑升级
 #define MyAppName "Folio"
-#define MyAppVersion "1.6.0"
+#define MyAppVersion "1.6.1"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/folio"
 
@@ -27,7 +29,7 @@ DefaultDirName={autopf}\folio
 DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=folio-1.6.0-setup
+OutputBaseFilename=folio-1.6.1-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

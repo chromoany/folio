@@ -7,7 +7,7 @@
  * 语言：托盘菜单与系统弹窗文案跟随界面语言（settings.language），
  *       界面内切换语言后经 preload 通知本进程即时重建托盘菜单。
  */
-const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell, ipcMain, session } = require('electron');
 const http = require('http');
 const https = require('https');
 const path = require('path');
@@ -192,20 +192,15 @@ function waitForServer(cb) {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.chromoany.folio');
 
-  // PDF 下载时弹「另存为」对话框
-  app.on('web-contents-created', (_e, contents) => {
-    contents.session.on('will-download', (_event, item) => {
-      const name = item.getFilename();
-      dialog
-        .showSaveDialog(mainWindow, {
-          title: t('savePdfTitle'),
-          defaultPath: name,
-          filters: [{ name: t('pdfFilter'), extensions: ['pdf'] }],
-        })
-        .then((r) => {
-          if (r.canceled || !r.filePath) item.cancel();
-          else item.setSavePath(r.filePath);
-        });
+  // PDF 下载时弹「另存为」对话框。
+  // 用 setSaveDialogOptions 定制系统自带保存对话框即可（只弹一个）；
+  // 不要在此叠加 dialog.showSaveDialog：will-download 里若不同步调用
+  // setSavePath，Electron 会自己再弹一次系统保存框，造成两个弹窗。
+  session.defaultSession.on('will-download', (_event, item) => {
+    item.setSaveDialogOptions({
+      title: t('savePdfTitle'),
+      defaultPath: item.getFilename(),
+      filters: [{ name: t('pdfFilter'), extensions: ['pdf'] }],
     });
   });
 
