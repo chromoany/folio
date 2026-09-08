@@ -1,4 +1,4 @@
-; mdbook 1.4.0 —— Windows 安装脚本（Inno Setup 6）
+; mdbook 1.4.1 —— Windows 安装脚本（Inno Setup 6）
 ; 更新点：
 ;   * 关闭窗口行为可配置：首次关闭时询问（收起托盘 / 直接退出），之后可在界面「设置」中更改
 ;   * 最小化 → 任务栏；托盘菜单可打开 / 检查更新 / 退出
@@ -7,8 +7,9 @@
 ;   * 全新设计的软件图标 mdbook.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
 ;   * 桌面 + 开始菜单快捷方式指向 mdbook.exe（安装时可勾选，默认勾选）
 ;   * 开始菜单提供「卸载 mdbook」，并确保写入系统「应用」列表
+;   * 安装时始终显示「选择安装位置」页：升级时预填上次安装目录，可改到 D 盘等任意位置
 #define MyAppName "mdbook"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.4.1"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/mdbook"
 
@@ -25,7 +26,7 @@ DefaultDirName={autopf}\mdbook
 DefaultGroupName=mdbook
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=mdbook-1.4.0-setup
+OutputBaseFilename=mdbook-1.4.1-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -33,7 +34,8 @@ SetupIconFile=mdbook.ico
 UninstallDisplayIcon={app}\mdbook.ico
 UninstallDisplayName=mdbook
 ; 保证卸载信息写入 Windows「已安装的应用」列表，可在设置/开始菜单右键卸载
-UsePreviousAppDir=yes
+; 始终显示「选择安装位置」页（升级时也显示，由下方 [Code] 预填上次目录）
+UsePreviousAppDir=no
 AppendDefaultDirName=no
 Uninstallable=yes
 
@@ -70,3 +72,29 @@ Type: files; Name: "{app}\README.zh.md"
 Name: "{group}\mdbook"; Filename: "{app}\mdbook.exe"; WorkingDir: "{app}"; IconFilename: "{app}\mdbook.ico"; Tasks: startmenu
 Name: "{group}\卸载 mdbook"; Filename: "{app}\unins000.exe"; Tasks: startmenu
 Name: "{autodesktop}\mdbook"; Filename: "{app}\mdbook.exe"; WorkingDir: "{app}"; IconFilename: "{app}\mdbook.ico"; Tasks: desktopicon
+
+[Code]
+// 升级时「选择安装位置」页预填上次安装目录，避免静默改回默认 C 盘导致重复安装
+function GetPreviousInstallDir(): string;
+var
+  S: string;
+begin
+  Result := '';
+  if RegQueryStringValue(HKLM32, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1', 'InstallLocation', S) then
+    Result := S
+  else if RegQueryStringValue(HKLM64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1', 'InstallLocation', S) then
+    Result := S
+  else if RegQueryStringValue(HKCU32, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1', 'InstallLocation', S) then
+    Result := S
+  else if RegQueryStringValue(HKCU64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1', 'InstallLocation', S) then
+    Result := S;
+end;
+
+procedure InitializeWizard;
+var
+  Prev: string;
+begin
+  Prev := GetPreviousInstallDir();
+  if (Prev <> '') and DirExists(Prev) then
+    WizardForm.DirEdit.Text := Prev;
+end;

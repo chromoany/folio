@@ -17,7 +17,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `mdbook-1.4.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
+推荐到 [Releases](../../releases) 下载 `mdbook-1.4.1-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

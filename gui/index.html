@@ -43,6 +43,18 @@
   .result .actions { display: flex; gap: 10px; flex-wrap: wrap; }
   #log { display: none; margin-top: 16px; background: #1e2430; color: #d6e2f5; border-radius: 10px; padding: 14px 16px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; max-height: 260px; overflow: auto; }
   .hint { color: var(--mut); font-size: 12px; margin-top: 8px; }
+  /* 右上角设置角标 + 弹窗 */
+  header { position: relative; padding-right: 46px; }
+  .gear { position: absolute; top: 0; right: 0; width: 36px; height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--mut); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .gear:hover { background: #e8ecf1; color: var(--txt); }
+  .gear svg { width: 19px; height: 19px; }
+  .modal-mask { display: none; position: fixed; inset: 0; z-index: 60; background: rgba(15,20,30,.42); align-items: center; justify-content: center; padding: 20px; }
+  .modal-mask.open { display: flex; }
+  .modal { background: var(--card); border-radius: 14px; width: min(440px, 100%); padding: 20px; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .modal-head b { font-size: 16px; }
+  .modal-close { border: 0; background: #eef0f3; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; color: #555; }
+  .modal-close:hover { background: #e0e4ea; }
 </style>
 </head>
 <body>
@@ -50,6 +62,9 @@
   <header>
     <h1>mdbook <span style="font-weight:400;color:var(--mut)">· Markdown → 书式 PDF</span></h1>
     <p>生成带目录、真实页码、可点击跳转的 PDF；目录里能查到每一节的页码</p>
+    <button class="gear" id="settingsBtn" title="设置" aria-label="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
   </header>
 
   <div class="card">
@@ -90,16 +105,21 @@
     <div id="log"></div>
   </div>
 
-  <div class="card">
-    <h2>④ 设置</h2>
-    <div class="field">
-      <label>关闭窗口时</label>
-      <select id="closeBehavior">
-        <option value="tray">收起至系统托盘（后台继续运行）</option>
-        <option value="quit">直接退出程序</option>
-      </select>
+  <div class="modal-mask" id="settingsMask">
+    <div class="modal">
+      <div class="modal-head">
+        <b>设置</b>
+        <button class="modal-close" id="settingsClose" title="关闭">×</button>
+      </div>
+      <div class="field">
+        <label>关闭窗口时</label>
+        <select id="closeBehavior">
+          <option value="tray">收起至系统托盘（后台继续运行）</option>
+          <option value="quit">直接退出程序</option>
+        </select>
+      </div>
+      <div class="hint">仅桌面版生效：点窗口右上角「×」时按此处理；最小化仍进任务栏。</div>
     </div>
-    <div class="hint">仅桌面版生效：点窗口右上角「×」时按此处理；最小化仍进任务栏。</div>
   </div>
 </div>
 
@@ -217,6 +237,15 @@
       body: JSON.stringify({ closeBehavior: closeBehaviorSel.value }),
     }).catch(() => {});
   });
+
+  // ---- 设置弹窗：右上角角标打开 / 关闭 ----
+  const settingsMask = document.getElementById('settingsMask');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsClose = document.getElementById('settingsClose');
+  settingsBtn.addEventListener('click', () => settingsMask.classList.add('open'));
+  settingsClose.addEventListener('click', () => settingsMask.classList.remove('open'));
+  settingsMask.addEventListener('click', (e) => { if (e.target === settingsMask) settingsMask.classList.remove('open'); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && settingsMask.classList.contains('open')) settingsMask.classList.remove('open'); });
 })();
 </script>
 </body>

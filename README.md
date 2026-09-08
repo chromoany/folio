@@ -17,7 +17,7 @@ Convert Markdown files into a book-style PDF with a table of contents and page n
 
 ## Install
 
-Recommended: download `mdbook-1.4.0-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
+Recommended: download `mdbook-1.4.1-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
