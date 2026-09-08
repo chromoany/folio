@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Folio 图形界面本地服务：127.0.0.1:4680
- * 桌面版由 desktop/main.js 内嵌启动；浏览器版可双击根目录「启动.vbs」→ 自动开浏览器。
+ * 桌面版由 desktop/main.js 内嵌启动。
  * 界面语言：settings.language（安装向导 / 软件设置），错误文案随语言输出。
  * 说明：转换的临时文件一律写到用户数据目录（%APPDATA%\folio\gui-runs），
  *       不再写入安装目录，避免卸载后残留 resources 等文件夹。
