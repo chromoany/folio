@@ -39,7 +39,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `folio-1.5.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
+推荐到 [Releases](../../releases) 下载 `folio-1.6.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

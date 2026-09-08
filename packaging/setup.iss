@@ -1,4 +1,7 @@
-﻿; Folio 1.5.0 —— Windows 安装脚本（Inno Setup 6）
+; Folio 1.6.0 —— Windows 安装脚本（Inno Setup 6）
+; v1.6.0 更新点：
+;   * 安装体积精简：Electron locales 仅保留中英语言包；pandoc/typst 引擎经 UPX 压缩
+;     （运行时自解压，转换功能与输出完全不变）
 ; v1.5.0 更新点：
 ;   * 安装时可选语言（简体中文 / English），向导全程随所选语言显示
 ;   * 安装完成页新增「立即启动 Folio」勾选项（默认勾选）
@@ -7,7 +10,7 @@
 ;   * （继承 1.4.1）关闭行为可配置、托盘、自动检查更新、独立桌面版、图标、快捷方式可选、始终可选安装目录
 ; 注：AppId 保持与旧版（mdbook/Folio）一致，便于从旧版平滑升级
 #define MyAppName "Folio"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "1.6.0"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/folio"
 
@@ -24,7 +27,7 @@ DefaultDirName={autopf}\folio
 DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=folio-1.5.0-setup
+OutputBaseFilename=folio-1.6.0-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

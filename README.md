@@ -39,7 +39,7 @@ Merging multiple files is nothing special by itself — a one-line Pandoc comman
 
 ## Install
 
-Recommended: download `folio-1.5.0-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
+Recommended: download `folio-1.6.0-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
