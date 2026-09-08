@@ -13,11 +13,13 @@
  */
 'use strict';
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const TMP = process.env.FOLIO_TMP || path.join(ROOT, '.build');
+// 转换中间文件默认放系统临时目录（GUI 也走这里），避免写入安装目录造成卸载残留/权限问题
+const TMP = process.env.FOLIO_TMP || path.join(os.tmpdir(), 'folio-runs');
 
 // 界面语言（zh/en）：GUI 经 cfg.lang 传入，CLI 默认中文；转换日志与错误提示随语言切换
 let UI_LANG = 'zh';
