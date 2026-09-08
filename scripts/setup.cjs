@@ -10,7 +10,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const VENDOR = path.resolve(__dirname, '..', 'vendor');
-const UA = { 'User-Agent': 'mdbook-setup' };
+const UA = { 'User-Agent': 'folio-setup' };
 
 async function latestAsset(repo, re) {
   const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers: UA });

@@ -1,17 +1,18 @@
-; mdbook 1.4.1 —— Windows 安装脚本（Inno Setup 6）
+; Folio 1.4.1 —— Windows 安装脚本（Inno Setup 6）
 ; 更新点：
 ;   * 关闭窗口行为可配置：首次关闭时询问（收起托盘 / 直接退出），之后可在界面「设置」中更改
 ;   * 最小化 → 任务栏；托盘菜单可打开 / 检查更新 / 退出
 ;   * 启动自动检查更新（GitHub Releases）
 ;   * 全新独立桌面版：Electron 打包，自带 Chromium 内核，无需浏览器、无需 Node.js
-;   * 全新设计的软件图标 mdbook.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
-;   * 桌面 + 开始菜单快捷方式指向 mdbook.exe（安装时可勾选，默认勾选）
-;   * 开始菜单提供「卸载 mdbook」，并确保写入系统「应用」列表
+;   * 全新设计的软件图标 folio.ico（安装器图标 / 快捷方式图标 / 卸载显示图标）
+;   * 桌面 + 开始菜单快捷方式指向 folio.exe（安装时可勾选，默认勾选）
+;   * 开始菜单提供「卸载 Folio」，并确保写入系统「应用」列表
 ;   * 安装时始终显示「选择安装位置」页：升级时预填上次安装目录，可改到 D 盘等任意位置
-#define MyAppName "mdbook"
+; 注：AppId 保持与旧版（mdbook）一致，便于从旧版平滑升级
+#define MyAppName "Folio"
 #define MyAppVersion "1.4.1"
 #define MyAppPublisher "chromoany"
-#define MyAppURL "https://github.com/chromoany/mdbook"
+#define MyAppURL "https://github.com/chromoany/folio"
 
 [Setup]
 AppId={{8A4D2C7E-6F1B-4C3E-9B5A-2D7F8E1A0C3B}
@@ -22,17 +23,17 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\mdbook
-DefaultGroupName=mdbook
+DefaultDirName={autopf}\folio
+DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=mdbook-1.4.1-setup
+OutputBaseFilename=folio-1.4.1-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=mdbook.ico
-UninstallDisplayIcon={app}\mdbook.ico
-UninstallDisplayName=mdbook
+SetupIconFile=folio.ico
+UninstallDisplayIcon={app}\folio.ico
+UninstallDisplayName=Folio
 ; 保证卸载信息写入 Windows「已安装的应用」列表，可在设置/开始菜单右键卸载
 ; 始终显示「选择安装位置」页（升级时也显示，由下方 [Code] 预填上次目录）
 UsePreviousAppDir=no
@@ -48,10 +49,10 @@ Name: "startmenu"; Description: "创建开始菜单快捷方式"; GroupDescripti
 Name: "desktopicon"; Description: "创建桌面图标"; GroupDescription: "快捷方式:"
 
 [Files]
-; Electron 桌面应用（mdbook.exe + Chromium 运行时 + 应用代码 + pandoc/typst）
-Source: "..\.build\electron\mdbook-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Electron 桌面应用（folio.exe + Chromium 运行时 + 应用代码 + pandoc/typst）
+Source: "..\.build\electron\folio-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; 软件图标随安装复制，供快捷方式 / 卸载显示使用
-Source: "mdbook.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "folio.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
 ; 升级时清理旧版（v1.1 及之前）直接铺在安装根目录的文件，避免残留
@@ -69,9 +70,9 @@ Type: files; Name: "{app}\README.md"
 Type: files; Name: "{app}\README.zh.md"
 
 [Icons]
-Name: "{group}\mdbook"; Filename: "{app}\mdbook.exe"; WorkingDir: "{app}"; IconFilename: "{app}\mdbook.ico"; Tasks: startmenu
-Name: "{group}\卸载 mdbook"; Filename: "{app}\unins000.exe"; Tasks: startmenu
-Name: "{autodesktop}\mdbook"; Filename: "{app}\mdbook.exe"; WorkingDir: "{app}"; IconFilename: "{app}\mdbook.ico"; Tasks: desktopicon
+Name: "{group}\Folio"; Filename: "{app}\folio.exe"; WorkingDir: "{app}"; IconFilename: "{app}\folio.ico"; Tasks: startmenu
+Name: "{group}\卸载 Folio"; Filename: "{app}\unins000.exe"; Tasks: startmenu
+Name: "{autodesktop}\Folio"; Filename: "{app}\folio.exe"; WorkingDir: "{app}"; IconFilename: "{app}\folio.ico"; Tasks: desktopicon
 
 [Code]
 // 升级时「选择安装位置」页预填上次安装目录，避免静默改回默认 C 盘导致重复安装

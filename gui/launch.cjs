@@ -7,7 +7,7 @@ const { spawn, execSync } = require('child_process');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const PORT = Number(process.env.MDBOOK_GUI_PORT || 4680);
+const PORT = Number(process.env.FOLIO_GUI_PORT || 4680);
 
 function killPortOwner(port) {
   try {

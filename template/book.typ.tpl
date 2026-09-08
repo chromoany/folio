@@ -1,4 +1,4 @@
-// 由 mdbook 生成（勿手改）：Markdown → 书籍版式 PDF 的 Typst 布局模板
+// 由 Folio 生成（勿手改）：Markdown → 书籍版式 PDF 的 Typst 布局模板
 #set document(title: "{{DOC_TITLE}}")
 #set text(font: ("{{CJK_FONT}}", "SimSun"), size: {{BASE_SIZE}}, lang: "zh")
 #set par(leading: 0.75em)

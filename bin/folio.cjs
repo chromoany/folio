@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * mdbook —— Markdown → 书籍版式 PDF（目录 + 页码 + 页脚页码）
+ * Folio —— Markdown → 书籍版式 PDF（目录 + 页码 + 页脚页码）
  *
  * 流程：pandoc(md → typst) → 注入 book 模板 → typst compile → PDF
  *
  * 用法：
- *   node mdbook.cjs 书.md -o 书.pdf --title "我的书"
- *   node mdbook.cjs 第1章.md 第2章.md -o 书.pdf            # 多文件按给定顺序合并
- *   node mdbook.cjs -c config.json                          # 从配置文件读
+ *   node folio.cjs 书.md -o 书.pdf --title "我的书"
+ *   node folio.cjs 第1章.md 第2章.md -o 书.pdf            # 多文件按给定顺序合并
+ *   node folio.cjs -c config.json                          # 从配置文件读
  *
  * 依赖：pandoc + typst（默认取 vendor/ 下便携版，也可 --pandoc-bin/--typst-bin 指定）
  */
@@ -17,7 +17,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const TMP = process.env.MDBOOK_TMP || path.join(ROOT, '.build');
+const TMP = process.env.FOLIO_TMP || path.join(ROOT, '.build');
 
 const DEFAULTS = {
   inputs: [],
@@ -30,11 +30,11 @@ const DEFAULTS = {
   font: { cjk: 'Microsoft YaHei', mono: 'Consolas', size: '10.5pt', monoSize: '8pt' },
 };
 
-const HELP = `mdbook —— Markdown → 书籍版式 PDF
+const HELP = `Folio —— Markdown → 书籍版式 PDF
 
 用法：
-  node mdbook.cjs <input.md...> -o <out.pdf> [选项]
-  node mdbook.cjs -c config.json
+  node folio.cjs <input.md...> -o <out.pdf> [选项]
+  node folio.cjs -c config.json
 
 选项：
   -o, --output <file>      输出 PDF（默认：第一个输入同名 .pdf）

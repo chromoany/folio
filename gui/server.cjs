@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * mdbook 图形界面本地服务：127.0.0.1:4680
+ * Folio 图形界面本地服务：127.0.0.1:4680
  * 双击根目录「启动.vbs」→ 自动开浏览器 → 选文件 → 转换
- * 测试时可设环境变量 MDBOOK_GUI_NO_OPEN=1 禁止自动开浏览器
+ * 测试时可设环境变量 FOLIO_GUI_NO_OPEN=1 禁止自动开浏览器
  */
 'use strict';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn, execSync } = require('child_process');
-const { build } = require('../bin/mdbook.cjs');
+const { build } = require('../bin/folio.cjs');
 const settings = require('../desktop/settings.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const RUNS = path.join(ROOT, '.build', 'gui-runs');
-const PORT = Number(process.env.MDBOOK_GUI_PORT || 4680);
+const PORT = Number(process.env.FOLIO_GUI_PORT || 4680);
 
 const jobs = new Map(); // id -> { pdf, name }
 
@@ -125,8 +125,8 @@ async function handle(req, res) {
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
         font: { cjk: 'Microsoft YaHei', mono: 'Consolas', size: '10.5pt', monoSize: '8pt' },
       };
-      // 每次转换都重新加载最新 mdbook.cjs，避免旧服务驻留旧代码导致旧效果
-      const cliPath = require.resolve('../bin/mdbook.cjs');
+      // 每次转换都重新加载最新 folio.cjs，避免旧服务驻留旧代码导致旧效果
+      const cliPath = require.resolve('../bin/folio.cjs');
       delete require.cache[cliPath];
       const fresh = require(cliPath);
       const logs = [];
@@ -176,7 +176,7 @@ function startServer(attempt) {
     }
     if (e.code === 'EADDRINUSE') {
       const url = `http://127.0.0.1:${PORT}`;
-      if (!process.env.MDBOOK_GUI_NO_OPEN) openPath(url);
+      if (!process.env.FOLIO_GUI_NO_OPEN) openPath(url);
       console.log('旧服务未能停止，直接用现有服务：' + url);
       process.exit(0);
     }
@@ -184,8 +184,8 @@ function startServer(attempt) {
   });
   srv.listen(PORT, '127.0.0.1', () => {
     const url = `http://127.0.0.1:${PORT}`;
-    console.log('mdbook GUI 已启动：' + url);
-    if (!process.env.MDBOOK_GUI_NO_OPEN) openPath(url);
+    console.log('Folio GUI 已启动：' + url);
+    if (!process.env.FOLIO_GUI_NO_OPEN) openPath(url);
   });
 }
 startServer(0);

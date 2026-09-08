@@ -1,13 +1,13 @@
 # 第一章 快速开始
 
-这是正文内容。给定一个 Markdown 文件，mdbook 会自动生成带目录和页码的 PDF。目录里的页码是排版后测出来的真实页码，可以点进去跳到对应章节。
+这是正文内容。给定一个 Markdown 文件，Folio 会自动生成带目录和页码的 PDF。目录里的页码是排版后测出来的真实页码，可以点进去跳到对应章节。
 
 ## 1.1 安装
 
 只需要 Node.js 和 pandoc、typst 两个便携版二进制：
 
 1. 运行 `scripts\setup.ps1` 下载二进制；
-2. 运行 `node bin/mdbook.cjs 书.md -o 书.pdf`。
+2. 运行 `node bin/folio.cjs 书.md -o 书.pdf`。
 
 ### 1.1.1 公式支持
 

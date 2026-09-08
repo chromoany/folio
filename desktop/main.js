@@ -1,6 +1,6 @@
 'use strict';
 /**
- * mdbook 桌面版入口（Electron 主进程）
+ * Folio 桌面版入口（Electron 主进程）
  * 复用 gui/server.cjs 作为本地服务，再用独立窗口加载 127.0.0.1:4680。
  * 打包后自带 Chromium 内核，不依赖系统浏览器。
  * 行为：最小化 → 任务栏；关闭 → 首次询问（托盘 / 退出），之后按设置执行。
@@ -11,13 +11,13 @@ const https = require('https');
 const path = require('path');
 const settings = require('./settings');
 
-const PORT = Number(process.env.MDBOOK_GUI_PORT || 4680);
+const PORT = Number(process.env.FOLIO_GUI_PORT || 4680);
 const URL = `http://127.0.0.1:${PORT}`;
-const RELEASE_API = 'https://api.github.com/repos/chromoany/mdbook/releases/latest';
-const RELEASE_PAGE = 'https://github.com/chromoany/mdbook/releases/latest';
+const RELEASE_API = 'https://api.github.com/repos/chromoany/folio/releases/latest';
+const RELEASE_PAGE = 'https://github.com/chromoany/folio/releases/latest';
 
 // 让 server.cjs 不要再用系统浏览器打开
-process.env.MDBOOK_GUI_NO_OPEN = '1';
+process.env.FOLIO_GUI_NO_OPEN = '1';
 
 let mainWindow = null;
 let tray = null;
@@ -39,8 +39,8 @@ function createWindow() {
     height: 820,
     minWidth: 640,
     minHeight: 560,
-    title: 'mdbook',
-    icon: path.join(path.dirname(process.execPath), 'mdbook.ico'),
+    title: 'Folio',
+    icon: path.join(path.dirname(process.execPath), 'folio.ico'),
     autoHideMenuBar: true,
     backgroundColor: '#f5f6f8',
     webPreferences: {
@@ -86,13 +86,13 @@ async function handleClose() {
 }
 
 function createTray() {
-  const iconPath = path.join(path.dirname(process.execPath), 'mdbook.ico');
+  const iconPath = path.join(path.dirname(process.execPath), 'folio.ico');
   let icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) icon = nativeImage.createEmpty();
   tray = new Tray(icon);
-  tray.setToolTip('mdbook');
+  tray.setToolTip('Folio');
   const menu = Menu.buildFromTemplate([
-    { label: '打开 mdbook', click: showWindow },
+    { label: '打开 Folio', click: showWindow },
     { label: '检查更新', click: () => checkForUpdates(true) },
     { type: 'separator' },
     { label: '退出', click: () => { isQuitting = true; app.quit(); } },
@@ -118,7 +118,7 @@ function compareVersions(a, b) {
 function httpsGetJson(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
-      headers: { 'User-Agent': 'mdbook', Accept: 'application/vnd.github+json' },
+      headers: { 'User-Agent': 'Folio', Accept: 'application/vnd.github+json' },
     }, (res) => {
       let d = '';
       res.on('data', (c) => (d += c));
@@ -140,7 +140,7 @@ async function checkForUpdates(manual) {
       const r = await dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: '发现新版本',
-        message: `mdbook 有新版本 v${latest}（当前 v${current}）`,
+        message: `Folio 有新版本 v${latest}（当前 v${current}）`,
         detail: '是否前往 GitHub 下载最新版？',
         buttons: ['前往下载', '稍后再说'],
         defaultId: 0,
@@ -172,7 +172,7 @@ function waitForServer(cb) {
 }
 
 app.whenReady().then(() => {
-  app.setAppUserModelId('com.chromoany.mdbook');
+  app.setAppUserModelId('com.chromoany.folio');
 
   // PDF 下载时弹「另存为」对话框
   app.on('web-contents-created', (_e, contents) => {
@@ -192,9 +192,9 @@ app.whenReady().then(() => {
   });
 
   try {
-    require('../gui/server.cjs'); // 启动本地服务（MDBOOK_GUI_NO_OPEN 已设，不会开浏览器）
+    require('../gui/server.cjs'); // 启动本地服务（FOLIO_GUI_NO_OPEN 已设，不会开浏览器）
   } catch (e) {
-    dialog.showErrorBox('mdbook 启动失败', String((e && e.stack) || e));
+    dialog.showErrorBox('Folio 启动失败', String((e && e.stack) || e));
     app.quit();
     return;
   }
