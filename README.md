@@ -4,7 +4,9 @@
 
 <p align="center"><img src="assets/logo.png" alt="mdbook" width="160"></p>
 
-Convert Markdown files into a book-style PDF with a table of contents and page numbers.
+Convert Markdown files into a **book-style PDF** with a table of contents and page numbers.
+
+> Not to be confused with the Rust ecosystem's [mdBook](https://github.com/rust-lang/mdBook), which builds HTML documentation — this project produces PDF books.
 
 ## Features
 
@@ -14,6 +16,23 @@ Convert Markdown files into a book-style PDF with a table of contents and page n
 - Standalone desktop app: bundled Chromium, no browser or Node.js needed
 - Configurable close behavior (tray or quit); automatic update check
 - Fully offline
+
+## Why mdbook?
+
+Most Markdown → PDF tools *print* a document; mdbook *typesets* it into a real book.
+
+- **Real page numbers in the TOC**: page numbers are measured after typesetting and clickable, not HTML anchors
+- **Book layout**: chapters (H1) start on a new page, title block, and multi-file merging into one book — out of the box
+- **Chinese-first, zero config**: no TeX Live, no CJK font setup; math is rendered natively by Typst
+- **Fully offline**: Pandoc + Typst portable binaries bundled, ready to run
+
+| | mdbook | Pandoc + LaTeX | VS Code / Typora / md-to-pdf |
+|---|---|---|---|
+| Output | Book | Document | Document |
+| Real page numbers in TOC | ✅ | Manual LaTeX template | ❌ |
+| Chinese / CJK | ✅ out of the box | Needs xeCJK | Environment-dependent |
+| Math | Typst native | LaTeX | Plugin-dependent |
+| Install size | Portable binaries | TeX Live (GBs) | Browser-dependent |
 
 ## Install
 

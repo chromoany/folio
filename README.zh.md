@@ -4,7 +4,9 @@
 
 <p align="center"><img src="assets/logo.png" alt="mdbook" width="160"></p>
 
-把 Markdown 文件转换成带目录和页码的书籍版式 PDF。
+把 Markdown 文件转换成带目录和页码的**书籍版式 PDF**。
+
+> 注意区分：这里不是 Rust 生态那个生成 HTML 文档的 [mdBook](https://github.com/rust-lang/mdBook)，本项目输出的是 PDF 书籍。
 
 ## 特性
 
@@ -14,6 +16,23 @@
 - 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
 - 关闭窗口行为可配置（托盘 / 退出）；启动自动检查更新
 - 完全离线运行
+
+## 为什么选 mdbook？
+
+大多数 Markdown → PDF 工具只是把文档「打印」出来；mdbook 把它「排」成一本真正的书。
+
+- **真实页码目录**：目录页码是排版后测出来的真实页码、可点击跳转，而非网页锚点
+- **书籍版式**：章节自动另起页、封面标题、多文件合并成书，开箱即用
+- **中文原生 + 零配置**：无需 TeX Live、无需配中文字体，公式走 Typst 原生渲染
+- **完全离线**：Pandoc + Typst 便携二进制内嵌，双击即用
+
+| | mdbook | Pandoc + LaTeX | VS Code / Typora / md-to-pdf |
+|---|---|---|---|
+| 产物 | 书籍 | 文档 | 文档 |
+| 真实页码目录 | ✅ | 需手写 LaTeX 模板 | ❌ |
+| 中文 | ✅ 开箱即用 | 需配 xeCJK | 视环境而定 |
+| 公式 | Typst 原生 | LaTeX | 视插件而定 |
+| 安装体积 | 便携二进制 | TeX Live 数 GB | 依赖浏览器 |
 
 ## 安装
 
