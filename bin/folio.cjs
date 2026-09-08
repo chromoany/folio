@@ -151,6 +151,62 @@ function normalizeLists(md) {
   return out.join('\n');
 }
 
+// 管道表格前补空行：pandoc（以及 GFM 规范）要求 pipe table 独占一个块——
+// 表格紧跟正文段落（如「说明：」行直接接表）时，整张表会被当作上一段的续行，
+// 折叠成一行带 | 的普通文本，PDF 里既没有表格又全部堆在一起。
+// 这里扫描「表头行 + 分隔行」形态的表格块，在前面补空行。代码围栏与缩进代码不处理。
+function normalizeTables(md) {
+  const LEADING_PIPE = /^[ \t]{0,3}\|/; // 0~3 空格 + |；≥4 空格是缩进代码块，跳过
+  const isDelimiterRow = (line) => {
+    if (!LEADING_PIPE.test(line)) return false;
+    let t = line.trim();
+    if (t.startsWith('|')) t = t.slice(1);
+    if (t.endsWith('|')) t = t.slice(0, -1);
+    const cells = t.split('|');
+    if (!cells.length) return false;
+    let anyDash = false;
+    for (const c of cells) {
+      const s = c.trim();
+      if (!/^:?-+:?$/.test(s)) return false;
+      if (/-/.test(s)) anyDash = true;
+    }
+    return anyDash;
+  };
+  const lines = md.split('\n');
+  const out = [];
+  let fence = null; // 当前围栏字符（``` 或 ~~~）
+  let i = 0;
+  const lastNonEmpty = (arr) => {
+    for (let k = arr.length - 1; k >= 0; k--) if (arr[k].trim() !== '') return arr[k];
+    return null;
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    const t = line.trim();
+    if (fence) { // 代码围栏内一律原样保留
+      out.push(line);
+      if (new RegExp('^' + fence + '+\\s*$').test(t)) fence = null;
+      i++;
+      continue;
+    }
+    if (/^(```+|~~~+)/.test(t)) { fence = t.slice(0, 3); out.push(line); i++; continue; }
+    // 表格起点：当前行是 | 开头的非分隔行，且下一行恰为分隔行
+    const next = lines[i + 1];
+    if (!isDelimiterRow(line) && LEADING_PIPE.test(line) && next !== undefined && isDelimiterRow(next)) {
+      const prev = lastNonEmpty(out);
+      if (prev !== null && !LEADING_PIPE.test(prev)) out.push(''); // 与上面正文隔开
+      while (i < lines.length && LEADING_PIPE.test(lines[i])) { // 整块表格原样搬入
+        out.push(lines[i]);
+        i++;
+      }
+      continue;
+    }
+    out.push(line);
+    i++;
+  }
+  return out.join('\n');
+}
+
 function parseArgs(argv) {
   const flags = {};
   const inputs = [];
@@ -270,7 +326,7 @@ function build(cfg, { log = () => {} } = {}) {
     let src = fs.readFileSync(p, 'utf8');
     if (src.charCodeAt(0) === 0xfeff) src = src.slice(1);
     const tmp = path.join(runDir, 'in-' + String(i).padStart(2, '0') + '.md');
-    fs.writeFileSync(tmp, normalizeLists(cleanMarkdown(src)), 'utf8');
+    fs.writeFileSync(tmp, normalizeTables(normalizeLists(cleanMarkdown(src))), 'utf8');
     return tmp;
   });
 

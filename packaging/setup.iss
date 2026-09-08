@@ -1,4 +1,7 @@
-; Folio 1.6.1 —— Windows 安装脚本（Inno Setup 6）
+; Folio 1.6.2 —— Windows 安装脚本（Inno Setup 6）
+; v1.6.2 更新点：
+;   * 修复：表格紧跟在正文段落后（之间无空行）时，被 Pandoc 折叠成一行带 | 的普通文本，
+;     PDF 不生成表格的问题（转换前自动为「表头行 + 分隔行」表格块补空行，GUI 与命令行均生效）
 ; v1.6.1 更新点：
 ;   * 修复：点击「下载 PDF」会连续弹出两个「另存为」对话框的问题
 ; v1.6.0 更新点：
@@ -12,7 +15,7 @@
 ;   * （继承 1.4.1）关闭行为可配置、托盘、自动检查更新、独立桌面版、图标、快捷方式可选、始终可选安装目录
 ; 注：AppId 保持与旧版（mdbook/Folio）一致，便于从旧版平滑升级
 #define MyAppName "Folio"
-#define MyAppVersion "1.6.1"
+#define MyAppVersion "1.6.2"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/folio"
 
@@ -29,7 +32,7 @@ DefaultDirName={autopf}\folio
 DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=folio-1.6.1-setup
+OutputBaseFilename=folio-1.6.2-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
