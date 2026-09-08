@@ -20,18 +20,22 @@ Convert Markdown files into a **book-style PDF** with a table of contents and pa
 
 Most Markdown → PDF tools *print* a document; Folio *typesets* it into a real book.
 
+- **Drop-in desktop app**: drag multiple .md files into the window → one click → a book with TOC; no CLI, no environment setup
 - **Real page numbers in the TOC**: page numbers are measured after typesetting and clickable, not HTML anchors
 - **Book layout**: chapters (H1) start on a new page, title block, and multi-file merging into one book — out of the box
 - **Chinese-first, zero config**: no TeX Live, no CJK font setup; math is rendered natively by Typst
 - **Fully offline**: Pandoc + Typst portable binaries bundled, ready to run
 
-| | Folio | Pandoc + LaTeX | VS Code / Typora / md-to-pdf |
-|---|---|---|---|
-| Output | Book | Document | Document |
-| Real page numbers in TOC | ✅ | Manual LaTeX template | ❌ |
-| Chinese / CJK | ✅ out of the box | Needs xeCJK | Environment-dependent |
-| Math | Typst native | LaTeX | Plugin-dependent |
-| Install size | Portable binaries | TeX Live (GBs) | Browser-dependent |
+| | Folio | mdBook | Quarto / bookdown / Pandoc | Typora / Obsidian |
+|---|---|---|---|---|
+| Merge multiple files into one PDF | ✅ drag & drop | 🔶 website by default; single PDF needs a plugin | ✅ (CLI only) | ❌ single file only |
+| Desktop GUI | ✅ built in | ❌ | ❌ | ✅ but single file only |
+| Real page numbers in TOC | ✅ automatic, clickable | 🔶 plugin-provided | 🔶 requires engine/template setup | ❌ |
+| Chinese / CJK | ✅ out of the box | ✅ native (web); PDF depends on plugin | 🔶 needs CJK font setup | 🔶 environment-dependent |
+| Math | ✅ Typst native | 🔶 needs KaTeX plugin | LaTeX | MathJax |
+| Install size | Portable binaries (Pandoc + Typst bundled) | Small (Rust toolchain) | TeX Live (GBs) | Electron / browser-dependent |
+
+Merging multiple files is nothing special by itself — a one-line Pandoc command and most book tooling can do it. What makes Folio different is the whole package: a desktop GUI, a real-page-number TOC, Chinese-first typesetting and full offline use, all out of the box.
 
 ## Install
 
