@@ -24,6 +24,8 @@ const APP_DIR = path.join(OUT_DIR, 'folio-win32-x64');
 const DIST_DIR = path.join(ROOT, 'dist');
 const ISS = path.join(ROOT, 'packaging', 'setup.iss');
 const ISCC = 'D:\\Programs\\Inno Setup 6\\ISCC.exe';
+const VERSION = require(path.join(ROOT, 'package.json')).version;
+const SETUP_EXE = `folio-${VERSION}-setup.exe`;
 
 // ---- 工具 ----
 function dirSize(d) {
@@ -139,7 +141,7 @@ async function pack() {
   // 步骤⑥ Inno Setup 出安装包
   console.log('⑥ Inno Setup 编译安装包 …');
   run(ISCC, [ISS], { cwd: ROOT });
-  const exe = path.join(DIST_DIR, 'folio-1.6.0-setup.exe');
+  const exe = path.join(DIST_DIR, SETUP_EXE);
   if (!fs.existsSync(exe)) throw new Error('未找到安装包: ' + exe);
   console.log('完成: ' + exe + '（' + mb(fs.statSync(exe).size) + '），耗时 ' + ((Date.now() - t0) / 1000).toFixed(0) + 's');
 }
