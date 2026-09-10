@@ -14,6 +14,7 @@ Convert Markdown files into a **book-style PDF** with a table of contents and pa
 - Standalone desktop app: bundled Chromium, no browser or Node.js needed
 - Bilingual UI (Simplified Chinese / English): pick a language during install, switch anytime in Settings
 - Configurable close behavior (tray or quit); automatic update check
+- Dark mode: dark / light / follow system, switchable anytime in Settings → Theme
 - Fully offline
 
 ## Why Folio?
@@ -39,7 +40,7 @@ Merging multiple files is nothing special by itself — a one-line Pandoc comman
 
 ## Install
 
-Recommended: download `folio-1.6.1-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
+Recommended: download `folio-1.7.0-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use.
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 

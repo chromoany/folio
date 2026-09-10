@@ -1,6 +1,6 @@
 {
   "name": "folio",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "Markdown → 书籍版式 PDF（独立桌面版，自带 Chromium 内核，无需浏览器）",
   "main": "desktop/main.js",
   "private": true,

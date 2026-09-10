@@ -10,6 +10,9 @@
  *   language：界面语言
  *     'zh' / 'en'，由用户在软件「设置」或安装向导中选择；
  *     未显式选择时：优先用安装向导写入的 install-lang.txt，其次跟随系统语言（中文系统 → zh，其余 → en）
+ *   theme：界面外观主题
+ *     'system' = 跟随系统深浅色（默认）/ 'light' = 浅色 / 'dark' = 深色（黑夜模式）；
+ *     只影响软件界面，不影响生成的 PDF
  */
 const fs = require('fs');
 const path = require('path');
@@ -26,7 +29,8 @@ const FILE = path.join(baseDir, 'settings.json');
 const LEGACY_FILE = path.join(process.env.APPDATA || process.env.HOME || process.cwd(), 'mdbook', 'settings.json');
 // 安装向导（Inno Setup）在安装结束时写入的首选语言：内容为 zh 或 en
 const INSTALL_LANG_FILE = path.join(baseDir, 'install-lang.txt');
-const DEFAULTS = { closeBehavior: null, language: null };
+const DEFAULTS = { closeBehavior: null, language: null, theme: null };
+const THEMES = ['system', 'light', 'dark'];
 
 // 更名（mdbook → Folio）后迁移旧版设置，避免用户重新选择关闭行为
 function migrateLegacy() {
@@ -75,6 +79,8 @@ function load() {
   if (cache.language !== 'zh' && cache.language !== 'en') {
     cache.language = installerLanguage() || systemLanguage();
   }
+  // theme 未显式设置（或值非法）时按「跟随系统」处理；同样不改写磁盘
+  if (!THEMES.includes(cache.theme)) cache.theme = 'system';
   return cache;
 }
 
@@ -91,9 +97,19 @@ function get(key) {
   return load()[key];
 }
 
+// 设置变更监听：主进程据此同步原生主题与窗口背景色（gui/server.cjs 与主进程同进程，无需再加 IPC）
+const listeners = new Set();
+function onChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 function set(key, value) {
   load()[key] = value;
   save();
+  for (const fn of listeners) {
+    try { fn(key, value); } catch (_) { /* 监听者出错不影响设置写入 */ }
+  }
 }
 
-module.exports = { get, set, load, getBaseDir: () => baseDir };
+module.exports = { get, set, load, onChange, THEMES, getBaseDir: () => baseDir };

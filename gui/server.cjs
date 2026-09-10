@@ -119,6 +119,13 @@ async function handle(req, res) {
           throw new Error(L('无效的语言设置', 'Invalid language setting'));
         }
       }
+      if (b.theme !== undefined) {
+        if (settings.THEMES.includes(b.theme)) {
+          settings.set('theme', b.theme);
+        } else {
+          throw new Error(L('无效的主题设置', 'Invalid theme setting'));
+        }
+      }
       sendJson(res, 200, { ok: true, settings: settings.load() });
       return;
     }

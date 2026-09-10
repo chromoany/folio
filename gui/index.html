@@ -5,56 +5,137 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Folio · Markdown → PDF</title>
 <link rel="icon" type="image/png" href="/icon.png">
+<script>
+// 首屏前先定主题，避免系统为深色时闪一下白底。
+// 设置里的选择缓存在 localStorage（下次启动即时生效），稍后由 /api/settings 校正为权威值。
+(function () {
+  try {
+    var p = localStorage.getItem('folio.theme');
+    var dark = p === 'dark' || (p !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  } catch (_) {}
+})();
+</script>
 <style>
-  :root { --accent: #2f6feb; --bg: #f5f6f8; --card: #fff; --line: #e3e6ea; --txt: #1a1d21; --mut: #6b7280; }
+  /* ---- 主题变量 ----
+     默认（无 data-theme 或 data-theme="light"）为浅色，data-theme="dark" 为黑夜模式。
+     界面所有颜色都从这些变量取，别处不要写死颜色，否则黑夜模式下会出现底/字撞色。
+     --bg 需与 desktop/main.js 的 THEME_BG 保持一致（窗口初始背景色，避免启动闪白）。 */
+  :root {
+    color-scheme: light;
+    --accent: #2f6feb;            /* 主色（按钮、强调文字） */
+    --accent-hover: #2457c7;
+    --accent-soft: #f0f5ff;       /* 拖拽高亮底色 */
+    --accent-ring: rgba(47,111,235,.18);
+    --accent-disabled: #a9c2f2;
+    --on-accent: #fff;            /* 主色之上的文字 */
+    --on-accent-disabled: #fff;   /* 禁用态主按钮文字（浅色与 --on-accent 一致，外观不变） */
+    --bg: #f5f6f8;                /* 页面底色 */
+    --card: #fff;                 /* 卡片底色 */
+    --field: #fff;                /* 输入框 / 下拉框底色 */
+    --soft: #fafbfc;              /* 次级面（文件列表项） */
+    --line: #e3e6ea;              /* 分隔线 / 卡片描边 */
+    --dash: #8b93a1;              /* 拖拽区虚线 */
+    --txt: #1a1d21;               /* 正文 */
+    --mut: #636d7a;               /* 次要文字 */
+    --ghost-bg: #eef0f3;          /* 次要按钮 */
+    --ghost-hover: #e0e4ea;
+    --ghost-txt: #333;
+    --danger-bg: #fde2e2;         /* 删除按钮悬停 */
+    --danger-txt: #b8342a;
+    --log-bg: #1e2430;            /* 日志框 */
+    --log-txt: #d6e2f5;
+    --ok-bg: #f2faf3;             /* 转换成功提示 */
+    --ok-line: #cfe6cf;
+    --ok-txt: #1e7d32;
+    --mask: rgba(15,20,30,.42);   /* 弹窗遮罩 */
+    --shadow-card: 0 1px 2px rgba(0,0,0,.03);
+    --shadow-modal: 0 12px 48px rgba(0,0,0,.25);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --accent: #6f9bff;
+    --accent-hover: #8bb0ff;
+    --accent-soft: rgba(111,155,255,.14);
+    --accent-ring: rgba(111,155,255,.28);
+    --accent-disabled: #3c4762;
+    --on-accent: #0d1017;
+    --on-accent-disabled: #b4bac4; /* 深色禁用态用灰字，避免深字压深底 */
+    --bg: #16181d;
+    --card: #1e2127;
+    --field: #23272f;
+    --soft: #252a33;
+    --line: #343a44;
+    --dash: #6b7480;
+    --txt: #e6e9ee;
+    --mut: #9aa3b0;
+    --ghost-bg: #2b303a;
+    --ghost-hover: #363c47;
+    --ghost-txt: #d7dbe2;
+    --danger-bg: rgba(229,90,74,.2);
+    --danger-txt: #ff8f80;
+    --log-bg: #101319;
+    --log-txt: #c9d4e3;
+    --ok-bg: rgba(63,185,80,.12);
+    --ok-line: rgba(63,185,80,.35);
+    --ok-txt: #56d364;
+    --mask: rgba(0,0,0,.62);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.35);
+    --shadow-modal: 0 12px 48px rgba(0,0,0,.6);
+  }
   * { box-sizing: border-box; }
+  html { background: var(--bg); }
   body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--txt); }
   .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
   header h1 { font-size: 22px; margin: 0; }
   header p { color: var(--mut); margin: 6px 0 0; font-size: 13px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; box-shadow: var(--shadow-card); }
   .card h2 { font-size: 15px; margin: 0 0 12px; }
-  .drop { border: 2px dashed #c3c9d2; border-radius: 10px; padding: 26px 16px; text-align: center; color: var(--mut); cursor: pointer; transition: .15s; }
-  .drop.drag { border-color: var(--accent); background: #f0f5ff; color: var(--accent); }
+  .drop { border: 2px dashed var(--dash); border-radius: 10px; padding: 26px 16px; text-align: center; color: var(--mut); cursor: pointer; transition: .15s; }
+  .drop.drag { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .drop b { color: var(--accent); }
   #fileInput { display: none; }
   .flist { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-  .fitem { display: flex; align-items: center; gap: 8px; background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+  .fitem { display: flex; align-items: center; gap: 8px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
   .fitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fitem .idx { color: var(--mut); font-size: 12px; width: 20px; text-align: right; }
-  .fitem button { border: 0; background: #eef0f3; border-radius: 5px; cursor: pointer; padding: 3px 7px; font-size: 12px; color: #333; }
-  .fitem button:hover { background: #e0e4ea; }
-  .fitem button.del:hover { background: #fde2e2; color: #c0392b; }
+  .fitem button { border: 0; background: var(--ghost-bg); border-radius: 5px; cursor: pointer; padding: 3px 7px; font-size: 12px; color: var(--ghost-txt); }
+  .fitem button:hover { background: var(--ghost-hover); }
+  .fitem button.del:hover { background: var(--danger-bg); color: var(--danger-txt); }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field.full { grid-column: 1 / -1; }
   .field label { font-size: 12px; color: var(--mut); }
-  input[type=text], input[type=number], select { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; width: 100%; }
+  input[type=text], input[type=number], select { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; width: 100%; background: var(--field); color: var(--txt); }
+  input[type=text]:focus, input[type=number]:focus, select:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+  input::placeholder { color: var(--mut); opacity: .8; }
   .checks { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
   .checks label { display: flex; align-items: center; gap: 6px; color: var(--txt); }
+  .checks input { accent-color: var(--accent); }
   .btn { border: 0; border-radius: 10px; padding: 13px 22px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .btn.primary { background: var(--accent); color: #fff; width: 100%; }
-  .btn.primary:hover { background: #2457c7; }
-  .btn.primary:disabled { background: #a9c2f2; cursor: not-allowed; }
-  .btn.ghost { background: #eef0f3; color: #333; }
-  .btn.ghost:hover { background: #e0e4ea; }
-  .result { display: none; margin-top: 16px; border: 1px solid #cfe6cf; background: #f2faf3; border-radius: 10px; padding: 14px 16px; }
-  .result .ok { color: #1e7d32; font-weight: 600; margin-bottom: 8px; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); width: 100%; }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.primary:disabled { background: var(--accent-disabled); color: var(--on-accent-disabled); cursor: not-allowed; }
+  .btn.ghost { background: var(--ghost-bg); color: var(--ghost-txt); }
+  .btn.ghost:hover { background: var(--ghost-hover); }
+  .result { display: none; margin-top: 16px; border: 1px solid var(--ok-line); background: var(--ok-bg); border-radius: 10px; padding: 14px 16px; }
+  .result .ok { color: var(--ok-txt); font-weight: 600; margin-bottom: 8px; }
   .result .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-  #log { display: none; margin-top: 16px; background: #1e2430; color: #d6e2f5; border-radius: 10px; padding: 14px 16px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+  #log { display: none; margin-top: 16px; background: var(--log-bg); color: var(--log-txt); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-family: Consolas, monospace; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; max-height: 260px; overflow: auto; }
   .hint { color: var(--mut); font-size: 12px; margin-top: 8px; }
   /* 右上角设置角标 + 弹窗 */
   header { position: relative; padding-right: 46px; }
   .gear { position: absolute; top: 0; right: 0; width: 36px; height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--mut); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  .gear:hover { background: #e8ecf1; color: var(--txt); }
+  .gear:hover { background: var(--ghost-bg); color: var(--txt); }
   .gear svg { width: 19px; height: 19px; }
-  .modal-mask { display: none; position: fixed; inset: 0; z-index: 60; background: rgba(15,20,30,.42); align-items: center; justify-content: center; padding: 20px; }
+  .modal-mask { display: none; position: fixed; inset: 0; z-index: 60; background: var(--mask); align-items: center; justify-content: center; padding: 20px; }
   .modal-mask.open { display: flex; }
-  .modal { background: var(--card); border-radius: 14px; width: min(440px, 100%); padding: 20px; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
+  .modal { background: var(--card); color: var(--txt); border: 1px solid var(--line); border-radius: 14px; width: min(440px, 100%); padding: 20px; box-shadow: var(--shadow-modal); }
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .modal-head b { font-size: 16px; }
-  .modal-close { border: 0; background: #eef0f3; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; color: #555; }
-  .modal-close:hover { background: #e0e4ea; }
+  .modal-close { border: 0; background: var(--ghost-bg); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; color: var(--ghost-txt); }
+  .modal-close:hover { background: var(--ghost-hover); }
   .modal .field + .field { margin-top: 12px; }
 </style>
 </head>
@@ -113,6 +194,15 @@
         <button class="modal-close" id="settingsClose" data-i18n-title="closeBtnTitle" title="关闭">×</button>
       </div>
       <div class="field">
+        <label data-i18n="lblTheme">外观主题</label>
+        <select id="themeSel">
+          <option value="system" data-i18n="optThemeSystem">跟随系统</option>
+          <option value="light" data-i18n="optThemeLight">浅色</option>
+          <option value="dark" data-i18n="optThemeDark">深色（黑夜模式）</option>
+        </select>
+        <div class="hint" data-i18n="themeHint">即时生效。「跟随系统」随 Windows 的深色/浅色设置自动切换；主题只改变软件界面，不影响生成的 PDF。</div>
+      </div>
+      <div class="field">
         <label data-i18n="lblClose">关闭窗口时</label>
         <select id="closeBehavior">
           <option value="tray" data-i18n="optTray">收起至系统托盘（后台继续运行）</option>
@@ -160,6 +250,11 @@
       chkBreak: '每章（H1）另起一页',
       step3Card: '③ 转换',
       goBtn: '开始转换',
+      lblTheme: '外观主题',
+      optThemeSystem: '跟随系统',
+      optThemeLight: '浅色',
+      optThemeDark: '深色（黑夜模式）',
+      themeHint: '即时生效。「跟随系统」随 Windows 的深色/浅色设置自动切换；主题只改变软件界面，不影响生成的 PDF。',
       lblClose: '关闭窗口时',
       optTray: '收起至系统托盘（后台继续运行）',
       optQuit: '直接退出程序',
@@ -207,6 +302,11 @@
       chkBreak: 'Each chapter (H1) starts a new page',
       step3Card: '③ Convert',
       goBtn: 'Convert',
+      lblTheme: 'Theme',
+      optThemeSystem: 'Follow system',
+      optThemeLight: 'Light',
+      optThemeDark: 'Dark',
+      themeHint: 'Applies instantly. “Follow system” matches your Windows light/dark setting. The theme only changes this app’s interface — the generated PDF is unaffected.',
       lblClose: 'When closing the window',
       optTray: 'Minimize to tray (keep running in background)',
       optQuit: 'Quit the app',
@@ -251,6 +351,33 @@
     if (langSel) langSel.value = cur;
     renderList();
   }
+
+  // ---- 主题（浅色 / 深色 / 跟随系统）----
+  const THEME_KEY = 'folio.theme';   // 与 <head> 首屏脚本共用：下次启动免闪白
+  let themePref = 'system';          // 用户选择：'system' | 'light' | 'dark'
+  const isDarkOS = () => {
+    try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (_) { return false; }
+  };
+
+  function applyTheme(pref, persist) {
+    themePref = (pref === 'light' || pref === 'dark') ? pref : 'system';
+    const theme = themePref === 'system' ? (isDarkOS() ? 'dark' : 'light') : themePref;
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    root.style.colorScheme = theme;   // 让滚动条 / 下拉列表等原生控件同色，避免底色与文字撞色
+    const sel = document.getElementById('themeSel');
+    if (sel) sel.value = themePref;
+    try { localStorage.setItem(THEME_KEY, themePref); } catch (_) {}
+    if (persist) postSettings({ theme: themePref });
+  }
+
+  // 系统深浅色变化时，「跟随系统」需实时跟随
+  try {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const onSystemTheme = () => { if (themePref === 'system') applyTheme('system', false); };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemTheme);
+    else if (mq.addListener) mq.addListener(onSystemTheme);
+  } catch (_) {}
 
   const drop = document.getElementById('drop');
   const input = document.getElementById('fileInput');
@@ -352,6 +479,7 @@
   const settingsClose = document.getElementById('settingsClose');
   const closeBehaviorSel = document.getElementById('closeBehavior');
   const langSel = document.getElementById('languageSel');
+  const themeSel = document.getElementById('themeSel');
 
   settingsBtn.addEventListener('click', () => settingsMask.classList.add('open'));
   settingsClose.addEventListener('click', () => settingsMask.classList.remove('open'));
@@ -366,6 +494,8 @@
     }).catch(() => {});
   }
 
+  themeSel.addEventListener('change', () => { applyTheme(themeSel.value, true); });
+
   closeBehaviorSel.addEventListener('change', () => {
     postSettings({ closeBehavior: closeBehaviorSel.value });
   });
@@ -377,8 +507,9 @@
     if (window.folio && window.folio.setLanguage) window.folio.setLanguage(v);
   });
 
-  // ---- 初始化：读取设置（语言 + 关闭行为），再应用文案 ----
+  // ---- 初始化：读取设置（主题 + 语言 + 关闭行为），再应用 ----
   (async () => {
+    let savedTheme = null;
     try {
       const r = await fetch('/api/settings');
       const j = await r.json();
@@ -389,8 +520,11 @@
         if (j.settings.language === 'en' || j.settings.language === 'zh') {
           cur = j.settings.language;
         }
+        if (['system', 'light', 'dark'].includes(j.settings.theme)) savedTheme = j.settings.theme;
       }
     } catch (_) {}
+    if (!savedTheme) { try { savedTheme = localStorage.getItem(THEME_KEY); } catch (_) {} }
+    applyTheme(savedTheme, false);   // 服务端设置为准，取不到时沿用首屏脚本用过的缓存值
     applyLang(cur);
   })();
 })();

@@ -14,6 +14,7 @@
 - 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
 - 双语界面（简体中文 / English）：安装时可选语言，随时可在「设置」里切换
 - 关闭窗口行为可配置（托盘 / 退出）；启动自动检查更新
+- 黑夜模式：深色 / 浅色 / 跟随系统，随时可在「设置 → 外观主题」切换
 - 完全离线运行
 
 ## 为什么选 Folio？
@@ -39,7 +40,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `folio-1.6.1-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
+推荐到 [Releases](../../releases) 下载 `folio-1.7.0-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

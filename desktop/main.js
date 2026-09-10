@@ -6,8 +6,10 @@
  * 行为：最小化 → 任务栏；关闭 → 首次询问（托盘 / 退出），之后按设置执行。
  * 语言：托盘菜单与系统弹窗文案跟随界面语言（settings.language），
  *       界面内切换语言后经 preload 通知本进程即时重建托盘菜单。
+ * 主题：界面外观主题（settings.theme）同步给 nativeTheme，窗口初始背景色随之切换，
+ *       避免黑夜模式下启动 / 缩放时闪一下白底。
  */
-const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell, ipcMain, session } = require('electron');
+const { app, BrowserWindow, dialog, Tray, Menu, nativeImage, shell, ipcMain, session, nativeTheme } = require('electron');
 const http = require('http');
 const https = require('https');
 const path = require('path');
@@ -22,9 +24,25 @@ const RELEASE_PAGE = 'https://github.com/chromoany/folio/releases/latest';
 // 让 server.cjs 不要再用系统浏览器打开
 process.env.FOLIO_GUI_NO_OPEN = '1';
 
+// 窗口背景色，须与 gui/index.html 里 --bg 的取值保持一致
+const THEME_BG = { light: '#f5f6f8', dark: '#16181d' };
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+
+// 把界面主题同步给原生层：themeSource 决定页面里的 prefers-color-scheme、
+// 原生控件（滚动条 / 下拉列表 / 系统弹窗）配色与窗口标题栏明暗
+function syncTheme() {
+  const pref = settings.get('theme');
+  nativeTheme.themeSource = settings.THEMES.includes(pref) ? pref : 'system';
+  applyWindowBackground();
+}
+
+function applyWindowBackground() {
+  if (!mainWindow) return;
+  mainWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? THEME_BG.dark : THEME_BG.light);
+}
 
 function showWindow() {
   if (mainWindow) {
@@ -45,7 +63,7 @@ function createWindow() {
     title: 'Folio',
     icon: path.join(path.dirname(process.execPath), 'folio.ico'),
     autoHideMenuBar: true,
-    backgroundColor: '#f5f6f8',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? THEME_BG.dark : THEME_BG.light,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -191,6 +209,12 @@ function waitForServer(cb) {
 
 app.whenReady().then(() => {
   app.setAppUserModelId('com.chromoany.folio');
+
+  // 主题：启动即应用；页面里改主题会经 POST /api/settings 落盘，
+  // 本进程与 gui/server.cjs 同进程，故监听设置变更即可即时同步
+  nativeTheme.on('updated', applyWindowBackground);
+  settings.onChange((key) => { if (key === 'theme') syncTheme(); });
+  syncTheme();
 
   // PDF 下载时弹「另存为」对话框。
   // 用 setSaveDialogOptions 定制系统自带保存对话框即可（只弹一个）；
