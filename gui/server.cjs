@@ -158,7 +158,7 @@ async function handle(req, res) {
         chapterBreak: b.chapterBreak !== false,
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-        font: { cjk: 'Microsoft YaHei', mono: 'Consolas', size: '10.5pt', monoSize: '8pt' },
+        font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt' },
         lang: settings.get('language'), // 转换日志/错误提示随界面语言
       };      // 每次转换都重新加载最新 folio.cjs，避免旧服务驻留旧代码导致旧效果
       const cliPath = require.resolve('../bin/folio.cjs');

@@ -1,4 +1,9 @@
-; Folio 1.7.1 —— Windows 安装脚本（Inno Setup 6）
+; Folio 1.7.2 —— Windows 安装脚本（Inno Setup 6）
+; v1.7.2 更新点：
+;   * 修复：代码块里的中文此前走系统兜底字体，渲染得又细又小、难以辨认；
+;     现默认使用中文等宽字体 NSimSun（新宋体），可经 font.monoCjk 配置项更换
+;   * 修复：表格单元格内代码 span 的 \| 未反转义，PDF 里显示成 x \| y（应为 x | y）——
+;     Pandoc 的 markdown reader 未实现 GFM 的「表格内转义在其他行内 span 中也生效」规则
 ; v1.7.1 更新点：
 ;   * 修复：Markdown 中的 HTML 表格（含 rowspan/colspan 合并单元格）此前不生成表格、
 ;     单元格被压成一行文字；现可正确还原为表格，并保留单元格内的换行与粗体/等宽格式
@@ -23,7 +28,7 @@
 ;   * （继承 1.4.1）关闭行为可配置、托盘、自动检查更新、独立桌面版、图标、快捷方式可选、始终可选安装目录
 ; 注：AppId 保持与旧版（mdbook/Folio）一致，便于从旧版平滑升级
 #define MyAppName "Folio"
-#define MyAppVersion "1.7.1"
+#define MyAppVersion "1.7.2"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/folio"
 
@@ -40,7 +45,7 @@ DefaultDirName={autopf}\folio
 DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=folio-1.7.1-setup
+OutputBaseFilename=folio-1.7.2-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

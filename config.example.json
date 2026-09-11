@@ -6,5 +6,5 @@
   "toc": { "enabled": true, "title": "目录", "depth": 3 },
   "chapterBreak": true,
   "page": { "paper": "a4", "marginX": "20mm", "marginY": "18mm" },
-  "font": { "cjk": "Microsoft YaHei", "mono": "Consolas", "size": "10.5pt", "monoSize": "8pt" }
+  "font": { "cjk": "Microsoft YaHei", "mono": "Consolas", "monoCjk": "NSimSun", "size": "10.5pt", "monoSize": "8pt" }
 }

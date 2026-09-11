@@ -1,5 +1,8 @@
--- Folio 组件（勿删）：pandoc Lua 过滤器 —— 修补 markdown reader 丢弃 HTML 的断链
+-- Folio 组件（勿删）：pandoc Lua 过滤器 —— 收集 pandoc markdown reader 的缺口修补
 -- 由 bin/folio.cjs 经 --lua-filter 调用；只读输入 AST，不写任何文件
+-- 当前两项修补：
+--   ① HTML 断链：reader 不解析 HTML，raw html 被 typst writer 静默丢弃（见下方【断链根因】）
+--   ② 表格单元格内代码 span 的 `\|` 未反转义（见文件末尾 unescape_pipe_code）
 --
 -- 【断链根因】
 --   pandoc 的 markdown reader 不解析 HTML：`-f markdown` 遇到 <table> 只吐一串
@@ -111,10 +114,30 @@ local function fix_inlines(inlines)
   return out
 end
 
+-- 表格单元格内的代码 span：pandoc 的 markdown reader 不把 `\|` 反转义成 `|`。
+-- GFM 规范要求「表格里写竖线必须转义，且该转义在代码 span 等其他行内 span 内部同样生效」，
+-- 而 pandoc 的 gfm reader 会正确产出 Code "a | b"、markdown reader 却留着 Code "a \| b"，
+-- 于是 typst 的 raw span 原样把反斜杠打出来（表格里显示成 `x \| y`）。
+-- 注意必须限定在表格内：表格**外** `` `a \| b` `` 的反斜杠本就该是字面量，两个 reader 都如此。
+-- 取舍：网格表（+---+）里的竖线本来不需要转义，此处也会一并反转义；但网格表里写 `\|`
+--       表达「字面反斜杠+竖线」的情况极罕见，而管道表里 `\|` 是刚需，故按前者让步。
+local function unescape_pipe_code(tbl)
+  return tbl:walk({
+    Code = function(el)
+      local fixed = el.text:gsub('\\|', '|')
+      if fixed ~= el.text then
+        el.text = fixed
+        return el
+      end
+    end,
+  })
+end
+
 function Pandoc(doc)
   local blocks, hits = fix_blocks(doc.blocks)
   doc.blocks = blocks
   doc = doc:walk({ Inlines = fix_inlines })
+  doc = doc:walk({ Table = unescape_pipe_code })
   io.stderr:write('[pandoc-html-fix] 重组块级 HTML ' .. hits .. ' 处\n')
   return doc
 end

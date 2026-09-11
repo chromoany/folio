@@ -70,7 +70,7 @@ const DEFAULTS = {
   toc: { enabled: true, title: '目录', depth: 3 },
   chapterBreak: true,
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-  font: { cjk: 'Microsoft YaHei', mono: 'Consolas', size: '10.5pt', monoSize: '8pt' },
+  font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt' },
 };
 
 const HELP = `Folio —— Markdown → 书籍版式 PDF
@@ -283,6 +283,7 @@ function renderTemplate(cfg) {
     .replaceAll('{{DOC_TITLE}}', strEsc(cfg.title))
     .replaceAll('{{CJK_FONT}}', strEsc(f.cjk))
     .replaceAll('{{MONO_FONT}}', strEsc(f.mono))
+    .replaceAll('{{MONO_CJK}}', strEsc(f.monoCjk || 'NSimSun'))
     .replaceAll('{{BASE_SIZE}}', f.size)
     .replaceAll('{{MONO_SIZE}}', f.monoSize)
     .replaceAll('{{PAPER}}', p.paper)

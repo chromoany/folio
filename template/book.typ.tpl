@@ -16,7 +16,10 @@
 )
 
 // 代码块：等宽字体 + 浅灰底
-#show raw: set text(font: ("{{MONO_FONT}}", "Courier New"), size: {{MONO_SIZE}})
+// 注意字体链第二个位置是代码块专用的中文字体：Consolas / Courier New 都不含汉字，
+// 不显式指定就会走系统兜底，落到度量不匹配的字体上导致中文又细又小（实测过）。
+// 默认 NSimSun（新宋体）——Windows 自带的中文等宽字体，与 Consolas 同栅格，汉字对齐不散。
+#show raw: set text(font: ("{{MONO_FONT}}", "{{MONO_CJK}}", "SimSun", "Courier New"), size: {{MONO_SIZE}})
 #show raw.where(block: true): it => block(
   fill: rgb("#f6f8fa"),
   inset: (x: 7pt, y: 5pt),
