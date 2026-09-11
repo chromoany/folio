@@ -21,6 +21,13 @@ const ROOT = path.resolve(__dirname, '..');
 // 转换中间文件默认放系统临时目录（GUI 也走这里），避免写入安装目录造成卸载残留/权限问题
 const TMP = process.env.FOLIO_TMP || path.join(os.tmpdir(), 'folio-runs');
 
+// pandoc 读 markdown 的格式串。必须带 -citations：pandoc 默认把正文里的 @xxx 解析成引文，
+// 输出 #cite(<xxx>) 让 typst 报 "does not contain a bibliography" 整本编译失败。
+// Folio 不生成参考文献（无 --citeproc / --bibliography），关掉纯赚：@提及 会正常转义成 \@xxx。
+const PANDOC_FROM = 'markdown-citations+tex_math_dollars';
+// 修补 HTML 断链的 Lua 过滤器（随 template/ 一起分发，见该文件头部注释）。缺失时自动降级
+const HTML_FIX_LUA = path.join(ROOT, 'template', 'pandoc-html-fix.lua');
+
 // 界面语言（zh/en）：GUI 经 cfg.lang 传入，CLI 默认中文；转换日志与错误提示随语言切换
 let UI_LANG = 'zh';
 
@@ -332,7 +339,8 @@ function build(cfg, { log = () => {} } = {}) {
 
   log(T('nFiles', cfg.inputs.length, outAbs));
   log(T('step1'));
-  run(pandocBin, ['-f', 'markdown+tex_math_dollars', '-t', 'typst', '--wrap=none', '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))], ROOT, 'pandoc');
+  const filterArgs = fs.existsSync(HTML_FIX_LUA) ? ['--lua-filter', HTML_FIX_LUA] : [];
+  run(pandocBin, ['-f', PANDOC_FROM, '-t', 'typst', '--wrap=none', ...filterArgs, '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))], ROOT, 'pandoc');
 
   log(T('step2'));
   fs.writeFileSync(mainFile, renderTemplate(cfg), 'utf8');

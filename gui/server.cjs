@@ -16,6 +16,8 @@ const settings = require('../desktop/settings.js');
 
 const RUNS = path.join(settings.getBaseDir(), 'gui-runs');
 const PORT = Number(process.env.FOLIO_GUI_PORT || 4680);
+// 设置弹窗里显示的版本号，单一来源就是 package.json（桌面版 app.getVersion() 读的也是它）
+const VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const jobs = new Map(); // id -> { pdf, name }
 
@@ -99,7 +101,7 @@ async function handle(req, res) {
       }
     }
     if (req.method === 'GET' && u.pathname === '/api/settings') {
-      sendJson(res, 200, { ok: true, settings: settings.load() });
+      sendJson(res, 200, { ok: true, version: VERSION, settings: settings.load() });
       return;
     }
 
@@ -126,7 +128,7 @@ async function handle(req, res) {
           throw new Error(L('无效的主题设置', 'Invalid theme setting'));
         }
       }
-      sendJson(res, 200, { ok: true, settings: settings.load() });
+      sendJson(res, 200, { ok: true, version: VERSION, settings: settings.load() });
       return;
     }
     if (req.method === 'POST' && u.pathname === '/api/convert') {

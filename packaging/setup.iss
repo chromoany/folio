@@ -1,4 +1,9 @@
-; Folio 1.7.0 —— Windows 安装脚本（Inno Setup 6）
+; Folio 1.7.1 —— Windows 安装脚本（Inno Setup 6）
+; v1.7.1 更新点：
+;   * 修复：Markdown 中的 HTML 表格（含 rowspan/colspan 合并单元格）此前不生成表格、
+;     单元格被压成一行文字；现可正确还原为表格，并保留单元格内的换行与粗体/等宽格式
+;   * 修复：正文或标题中出现 @ 符号（如 @用户名）会导致整本 PDF 编译失败的问题
+;   * 新增：设置弹窗底部显示当前版本号
 ; v1.7.0 更新点：
 ;   * 新增黑夜模式：界面「设置 → 外观主题」可选「跟随系统 / 浅色 / 深色」（默认跟随系统）；
 ;     深色下页面底色、卡片、输入框、按钮、日志框、弹窗等全部随主题切换，不再出现底/字撞色
@@ -18,7 +23,7 @@
 ;   * （继承 1.4.1）关闭行为可配置、托盘、自动检查更新、独立桌面版、图标、快捷方式可选、始终可选安装目录
 ; 注：AppId 保持与旧版（mdbook/Folio）一致，便于从旧版平滑升级
 #define MyAppName "Folio"
-#define MyAppVersion "1.7.0"
+#define MyAppVersion "1.7.1"
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/folio"
 
@@ -35,7 +40,7 @@ DefaultDirName={autopf}\folio
 DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=folio-1.7.0-setup
+OutputBaseFilename=folio-1.7.1-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

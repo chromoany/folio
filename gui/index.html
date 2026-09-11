@@ -137,6 +137,9 @@
   .modal-close { border: 0; background: var(--ghost-bg); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; color: var(--ghost-txt); }
   .modal-close:hover { background: var(--ghost-hover); }
   .modal .field + .field { margin-top: 12px; }
+  /* 设置弹窗底部版本号：与上方设置项用细线隔开，弱化为辅助信息 */
+  .modal-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--mut); font-size: 12px; }
+  .modal-foot .ver { font-family: Consolas, monospace; color: var(--txt); }
 </style>
 </head>
 <body>
@@ -218,6 +221,10 @@
         </select>
         <div class="hint" data-i18n="langHint">语言即时生效，托盘菜单与系统弹窗同步切换。</div>
       </div>
+      <div class="modal-foot">
+        <span data-i18n="lblVersion">版本</span>
+        <span class="ver" id="appVersion">—</span>
+      </div>
     </div>
   </div>
 </div>
@@ -263,6 +270,7 @@
       optZh: '中文',
       optEn: 'English',
       langHint: '语言即时生效，托盘菜单与系统弹窗同步切换。',
+      lblVersion: '版本',
       up: '上移',
       down: '下移',
       del: '移除',
@@ -315,6 +323,7 @@
       optZh: '中文',
       optEn: 'English',
       langHint: 'Applies immediately — tray menu and system dialogs switch too.',
+      lblVersion: 'Version',
       up: 'Move up',
       down: 'Move down',
       del: 'Remove',
@@ -514,6 +523,10 @@
       const r = await fetch('/api/settings');
       const j = await r.json();
       if (j.ok && j.settings) {
+        if (j.version) {
+          const verEl = document.getElementById('appVersion');
+          if (verEl) verEl.textContent = 'v' + j.version;
+        }
         if (j.settings.closeBehavior === 'tray' || j.settings.closeBehavior === 'quit') {
           closeBehaviorSel.value = j.settings.closeBehavior;
         }
