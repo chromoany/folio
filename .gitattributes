@@ -2,3 +2,4 @@
 *.vbs text eol=crlf
 *.cjs text eol=lf
 *.typ text eol=lf
+*.lua text eol=lf
