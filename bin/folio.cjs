@@ -42,6 +42,14 @@ const MSG = {
     notFound: (label, cmd) => `找不到 ${label}（${cmd}）。请先运行 scripts\\setup.cjs，或用 --${label}-bin 指定路径`,
     runErr: (label, msg) => `${label} 执行出错：${msg}`,
     failed: (label, status, tail) => `${label} 执行失败（退出码 ${status}）${tail ? '\n' + tail : ''}`,
+    // 下面这些是「Folio 改动了你的原文」的提示：任何静默改写都必须留下痕迹
+    skipToc: (n) => `[folio] 跳过 ${n} 处手写目录（目录按标题自动生成）`,
+    paddedBlocks: (parts) => `[folio] 预处理改动了原文：${parts.join('；')}（pandoc 需要块级语法，否则会折进上一段）`,
+    padLists: (n) => `${n} 处列表`,
+    padTables: (n) => `${n} 处表格`,
+    dashTables: (n) => `[folio] 还原 ${n} 处被误判成表格的分隔线（pandoc 把 --- 当表格边框，会竖排成一列）`,
+    narrowColumns: (n) => `[folio] 修正 ${n} 处过窄的表格列宽（pandoc 按字符数估算，中文列会偏窄成竖条）`,
+    htmlBlocks: (n) => `[folio] 重组 ${n} 处 HTML 块（原生 markdown 不解析 HTML，不重组会被丢弃）`,
   },
   en: {
     noInput: 'No input files',
@@ -53,6 +61,14 @@ const MSG = {
     notFound: (label, cmd) => `Cannot find ${label} (${cmd}). Run scripts\\setup.cjs first, or use --${label}-bin`,
     runErr: (label, msg) => `${label} failed to run: ${msg}`,
     failed: (label, status, tail) => `${label} failed (exit code ${status})${tail ? '\n' + tail : ''}`,
+    // Notes about content Folio changed in the source: every silent rewrite must leave a trace
+    skipToc: (n) => `[folio] skipped ${n} hand-written TOC section(s) (the TOC is generated from headings)`,
+    paddedBlocks: (parts) => `[folio] source was preprocessed: ${parts.join('; ')} (pandoc needs block-level syntax; otherwise they merge into the previous paragraph)`,
+    padLists: (n) => `${n} list(s)`,
+    padTables: (n) => `${n} table(s)`,
+    dashTables: (n) => `[folio] restored ${n} thematic break(s) mis-parsed as a table (pandoc reads --- as a table border; the column ended up one character wide)`,
+    narrowColumns: (n) => `[folio] widened ${n} table(s) with too-narrow columns (pandoc estimates widths by character count, which is off for CJK)`,
+    htmlBlocks: (n) => `[folio] rebuilt ${n} HTML block(s) (plain markdown does not parse HTML; they would be dropped)`,
   },
 };
 
@@ -113,16 +129,27 @@ function contEsc(s) {
 }
 
 // 兼容旧版 md：去掉「## 目录」手写目录、<a id> 锚点、分页 <div>、p.??? 占位（新管线会自己生成目录）
-function cleanMarkdown(src) {
+// report 用来告知「原文被改动了」（结构化事件，由 build 汇总成一行日志）——静默吞内容会让用户以为转换出 bug
+function cleanMarkdown(src, report = () => {}) {
   const lines = src.split(/\r?\n/);
   const out = [];
   let inToc = false;
-  for (const line of lines) {
+  let tocLines = 0;
+  const closeToc = () => {
+    if (inToc) report({ type: 'toc', lines: tocLines });
+    inToc = false;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const t = line.trim();
-    if (/^#{1,2}\s*目录\s*$/.test(t)) { inToc = true; continue; }
+    if (/^#{1,2}\s*目录\s*$/.test(t)) {
+      closeToc();
+      inToc = true; tocLines = 1;
+      continue;
+    }
     if (inToc) {
-      if (/^#{1,6}\s+/.test(t) || /<div[^>]*page-break/i.test(line)) inToc = false;
-      else continue;
+      if (/^#{1,6}\s+/.test(t) || /<div[^>]*page-break/i.test(line)) closeToc();
+      else { tocLines++; continue; }
     }
     if (/^\s*\[TOC\]\s*$/i.test(t)) continue;
     let l = line
@@ -131,15 +158,17 @@ function cleanMarkdown(src) {
       .replace(/p\.\?\?\?/g, '');
     out.push(l);
   }
+  closeToc(); // 手写目录一直延续到文件末尾的情况
   return out.join('\n');
 }
 
 // 列表前补空行：段落/标题后紧跟列表时，pandoc 会输出行内「- 」分隔符导致乱折行；
 // 补空行让其变成 loose 列表，pandoc 才输出真正的 Typst 列表语法。代码围栏内不处理。
-function normalizeLists(md) {
+function normalizeLists(md, report = () => {}) {
   const lines = md.split('\n');
   const out = [];
   let fence = null;
+  let padded = 0;
   const isListItem = (t) => /^[-*+]\s+/.test(t) || /^\d+[.)]\s+/.test(t);
   for (const line of lines) {
     const t = line.trim();
@@ -151,10 +180,11 @@ function normalizeLists(md) {
     if (/^(```+|~~~+)/.test(t)) { fence = t.slice(0, 3); out.push(line); continue; }
     if (isListItem(t) && out.length) {
       const prev = out[out.length - 1].trim();
-      if (prev !== '' && !isListItem(prev)) out.push('');
+      if (prev !== '' && !isListItem(prev)) { out.push(''); padded++; }
     }
     out.push(line);
   }
+  if (padded) report({ type: 'lists', count: padded });
   return out.join('\n');
 }
 
@@ -162,7 +192,7 @@ function normalizeLists(md) {
 // 表格紧跟正文段落（如「说明：」行直接接表）时，整张表会被当作上一段的续行，
 // 折叠成一行带 | 的普通文本，PDF 里既没有表格又全部堆在一起。
 // 这里扫描「表头行 + 分隔行」形态的表格块，在前面补空行。代码围栏与缩进代码不处理。
-function normalizeTables(md) {
+function normalizeTables(md, report = () => {}) {
   const LEADING_PIPE = /^[ \t]{0,3}\|/; // 0~3 空格 + |；≥4 空格是缩进代码块，跳过
   const isDelimiterRow = (line) => {
     if (!LEADING_PIPE.test(line)) return false;
@@ -182,6 +212,7 @@ function normalizeTables(md) {
   const lines = md.split('\n');
   const out = [];
   let fence = null; // 当前围栏字符（``` 或 ~~~）
+  let padded = 0;
   let i = 0;
   const lastNonEmpty = (arr) => {
     for (let k = arr.length - 1; k >= 0; k--) if (arr[k].trim() !== '') return arr[k];
@@ -201,7 +232,7 @@ function normalizeTables(md) {
     const next = lines[i + 1];
     if (!isDelimiterRow(line) && LEADING_PIPE.test(line) && next !== undefined && isDelimiterRow(next)) {
       const prev = lastNonEmpty(out);
-      if (prev !== null && !LEADING_PIPE.test(prev)) out.push(''); // 与上面正文隔开
+      if (prev !== null && !LEADING_PIPE.test(prev)) { out.push(''); padded++; } // 与上面正文隔开
       while (i < lines.length && LEADING_PIPE.test(lines[i])) { // 整块表格原样搬入
         out.push(lines[i]);
         i++;
@@ -211,7 +242,32 @@ function normalizeTables(md) {
     out.push(line);
     i++;
   }
+  if (padded) report({ type: 'tables', count: padded });
   return out.join('\n');
+}
+
+// pandoc 的 typst writer 按**源文本字符数**估算表格列宽百分比：中文列在源里字符少、
+// 实际显示宽度却是两倍，于是中文表格经常拿到 1%~5% 的病态列宽。typst 会照单全收，
+// 把那一列压成「一个字一行」的竖条，长内容还直接溢出页面（不报错，只看渲染才发现）。
+// 这里把过窄的百分比列宽换成 auto（typst 按实际内容宽度自适应）——只动过窄的列，
+// 其余比例原样保留；列宽本来就不是百分比（auto / 1fr / 整数）的表格不受影响。
+const MIN_COL_PCT = 10; // 低于可用宽度的 10%（A4 双栏边距下约 17mm）基本放不下几个汉字
+function fixNarrowColumns(typ, report = () => {}) {
+  let fixed = 0;
+  const out = typ.replace(/columns:\s*\(([^()]*)\),/g, (whole, inner) => {
+    const parts = inner.split(',').map((s) => s.trim()).filter(Boolean);
+    let touched = false;
+    const next = parts.map((p) => {
+      const m = /^([\d.]+)%$/.exec(p);
+      if (m && Number(m[1]) < MIN_COL_PCT) { touched = true; return 'auto'; }
+      return p;
+    });
+    if (!touched) return whole;
+    fixed++;
+    return `columns: (${next.join(', ')},),`;
+  });
+  if (fixed) report(T('narrowColumns', fixed));
+  return out;
 }
 
 function parseArgs(argv) {
@@ -294,11 +350,13 @@ function renderTemplate(cfg) {
     .replaceAll('{{TOC_BLOCK}}', tocBlock);
 }
 
-function run(cmd, args, cwd, label) {
-  let r = spawnSync(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', windowsHide: true });
+function run(cmd, args, cwd, label, opts = {}) {
+  const base = { cwd, encoding: 'utf8', windowsHide: true };
+  if (opts.env) base.env = { ...process.env, ...opts.env };
+  let r = spawnSync(cmd, args, { ...base, stdio: ['ignore', 'pipe', 'pipe'] });
   if (r.error && r.error.code === 'EPERM') {
-    // 受限环境（如沙箱）无法用管道捕获输出，回退为直接继承
-    r = spawnSync(cmd, args, { cwd, stdio: 'inherit' });
+    // 受限环境（如沙箱）无法用管道捕获输出，回退为直接继承（此时拿不到 stderr，靠报告文件）
+    r = spawnSync(cmd, args, { ...base, stdio: 'inherit' });
   }
   if (r.error) {
     if (r.error.code === 'ENOENT') {
@@ -311,6 +369,7 @@ function run(cmd, args, cwd, label) {
     const tail = err ? err.split('\n').slice(-20).join('\n') : '';
     throw new Error(T('failed', label, r.status, tail));
   }
+  return String(r.stderr || '').trim();
 }
 
 /** 执行完整转换。cfg 见 DEFAULTS，可额外带 pandocBin / typstBin。返回 { output, size, runDir } */
@@ -330,18 +389,44 @@ function build(cfg, { log = () => {} } = {}) {
   fs.mkdirSync(path.dirname(outAbs), { recursive: true });
 
   // 预处理：清洗旧版目录/锚点/分页 div，保证任意 md 都能进
+  // 这些函数都会改写原文，改动经 note() 累加，最后汇总成一行日志（多文件时不刷屏）
+  const stats = { toc: 0, lists: 0, tables: 0 };
+  const note = (e) => {
+    if (e.type === 'toc') stats.toc++;
+    else if (e.type === 'lists') stats.lists += e.count;
+    else if (e.type === 'tables') stats.tables += e.count;
+  };
   const cleanedInputs = cfg.inputs.map((p, i) => {
     let src = fs.readFileSync(p, 'utf8');
     if (src.charCodeAt(0) === 0xfeff) src = src.slice(1);
     const tmp = path.join(runDir, 'in-' + String(i).padStart(2, '0') + '.md');
-    fs.writeFileSync(tmp, normalizeTables(normalizeLists(cleanMarkdown(src))), 'utf8');
+    fs.writeFileSync(tmp, normalizeTables(normalizeLists(cleanMarkdown(src, note), note), note), 'utf8');
     return tmp;
   });
 
   log(T('nFiles', cfg.inputs.length, outAbs));
+  if (stats.toc) log(T('skipToc', stats.toc));
+  if (stats.lists || stats.tables) {
+    const parts = [];
+    if (stats.lists) parts.push(T('padLists', stats.lists));
+    if (stats.tables) parts.push(T('padTables', stats.tables));
+    log(T('paddedBlocks', parts));
+  }
   log(T('step1'));
   const filterArgs = fs.existsSync(HTML_FIX_LUA) ? ['--lua-filter', HTML_FIX_LUA] : [];
-  run(pandocBin, ['-f', PANDOC_FROM, '-t', 'typst', '--wrap=none', ...filterArgs, '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))], ROOT, 'pandoc');
+  // 过滤器（HTML 重组 / 分隔线误判还原）把改动统计写进这个文件，再转成界面语言的日志
+  const reportFile = path.join(runDir, 'filter-report.txt');
+  const stderr = run(pandocBin, ['-f', PANDOC_FROM, '-t', 'typst', '--wrap=none', ...filterArgs, '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))],
+    ROOT, 'pandoc', { env: { FOLIO_FILTER_REPORT: reportFile } });
+  const report = fs.existsSync(reportFile) ? fs.readFileSync(reportFile, 'utf8') : stderr;
+  const m = /html_blocks=(\d+)[\s\S]*?dash_tables=(\d+)/.exec(report);
+  if (m) {
+    if (Number(m[1])) log(T('htmlBlocks', Number(m[1])));
+    if (Number(m[2])) log(T('dashTables', Number(m[2])));
+  }
+
+  // pandoc 写出的 typst 列宽可能病态偏窄（中文表格尤甚），编译前兜底一次
+  fs.writeFileSync(bodyFile, fixNarrowColumns(fs.readFileSync(bodyFile, 'utf8'), (m2) => log(m2)), 'utf8');
 
   log(T('step2'));
   fs.writeFileSync(mainFile, renderTemplate(cfg), 'utf8');

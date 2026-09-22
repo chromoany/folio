@@ -1,8 +1,9 @@
 -- Folio 组件（勿删）：pandoc Lua 过滤器 —— 收集 pandoc markdown reader 的缺口修补
 -- 由 bin/folio.cjs 经 --lua-filter 调用；只读输入 AST，不写任何文件
--- 当前两项修补：
+-- 当前三项修补：
 --   ① HTML 断链：reader 不解析 HTML，raw html 被 typst writer 静默丢弃（见下方【断链根因】）
---   ② 表格单元格内代码 span 的 `\|` 未反转义（见文件末尾 unescape_pipe_code）
+--   ② 表格单元格内代码 span 的 `\|` 未反转义（见 unescape_pipe_code）
+--   ③ 分隔线被误判成表格：单独一行的 `---` 被 multiline table 抢走（见 unwrap_dash_table）
 --
 -- 【断链根因】
 --   pandoc 的 markdown reader 不解析 HTML：`-f markdown` 遇到 <table> 只吐一串
@@ -133,11 +134,78 @@ local function unescape_pipe_code(tbl)
   })
 end
 
+-- 单独一行的分隔线会被 pandoc 的 markdown reader 抢去当 multiline table 的边框：
+--     上文
+--     <空行>
+--     ---
+--     第一行正文        <- 上面那条分隔线之后**不留空行**，这一行就成了表头
+--     第二行正文
+--     <空行>
+--     ---               <- 再出现一条分隔线，表格闭合
+-- 结果是「单列、无表头」的 Table：一或几行正文被塞进单元格。typst writer 随后按
+-- 4/--columns（默认 5.56%）估算列宽，typst 把这一列压成「一个字一行」的竖条，
+-- 长内容还会直接溢出页面 —— 全程零报错（silent degradation，只能看渲染结果才发现）。
+-- 反证：`-f gfm` 读同一段不会退化成表格；管道表 / 网格表有表头行，列宽另算，不适用本例。
+-- 修法：既然是误判就不是用户要的表格 —— 把单元格内容按块还原回正文（`Plain` 升级成 `Para`）。
+-- 判据三重收紧，避免误伤真表格：
+--   ① 单列           —— `---` 没有列分隔符，误判产物必然是单列
+--   ② 无表头         —— 管道表 / 网格表都带表头行
+--   ③ 列宽窄或未指定 —— 误判的列宽要么是 nil（未指定），要么是 writer 按 4/--columns 估出来的
+--                       小数值（默认 5.56%）；而 HTML reader 解析出的单列表格列宽是 1.0
+--                       （实测），真实网格表由源宽度决定，都不会落进来
+local function is_dash_misparse(tbl)
+  if #tbl.colspecs ~= 1 then return false end
+  if #tbl.head.rows ~= 0 then return false end
+  if tbl.caption and tbl.caption.long and #tbl.caption.long > 0 then return false end
+  local w = tbl.colspecs[1][2] -- pandoc 的 Lua 里列宽就是数字，未指定时为 nil（ColWidthDefault）
+  if w ~= nil and (type(w) ~= 'number' or w > 0.5) then return false end
+  return true
+end
+
+local function unwrap_dash_table(tbl)
+  local out = {}
+  local function add(blks)
+    for _, b in ipairs(blks) do
+      if b.t == 'Plain' then out[#out + 1] = pandoc.Para(b.content)
+      else out[#out + 1] = b end
+    end
+  end
+  local function add_row(row)
+    for _, cell in ipairs(row.cells) do add(cell.contents) end
+  end
+  for _, row in ipairs(tbl.head.rows) do add_row(row) end
+  for _, body in ipairs(tbl.bodies) do
+    for _, row in ipairs(body.body) do add_row(row) end
+  end
+  for _, row in ipairs(tbl.foot.rows) do add_row(row) end
+  return out
+end
+
 function Pandoc(doc)
   local blocks, hits = fix_blocks(doc.blocks)
   doc.blocks = blocks
   doc = doc:walk({ Inlines = fix_inlines })
   doc = doc:walk({ Table = unescape_pipe_code })
-  io.stderr:write('[pandoc-html-fix] 重组块级 HTML ' .. hits .. ' 处\n')
+  local dash = 0
+  doc = doc:walk({
+    Table = function(tbl)
+      if is_dash_misparse(tbl) then
+        dash = dash + 1
+        return unwrap_dash_table(tbl) -- 返回块列表：pandoc 用这些块替换掉该元素
+      end
+    end,
+  })
+  -- 统计交给 bin/folio.cjs：优先写报告文件（路径由环境变量给，stdio 被 inherit 时也能拿到），
+  -- 再往 stderr 写一行机器可读的版本，便于单独手跑 pandoc 时诊断
+  local line = 'html_blocks=' .. hits .. '\ndash_tables=' .. dash .. '\n'
+  local report = os.getenv('FOLIO_FILTER_REPORT')
+  if report then
+    local f = io.open(report, 'w')
+    if f then
+      f:write(line)
+      f:close()
+    end
+  end
+  io.stderr:write('[folio-filter] ' .. line)
   return doc
 end
