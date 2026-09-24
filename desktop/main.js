@@ -54,6 +54,13 @@ function showWindow() {
   }
 }
 
+// 统一弹窗入口：窗口可能正在关闭 / 已销毁（如自动检查更新恰好赶上退出），
+// 此时退化为无父窗口弹窗，避免 showMessageBox(mainWindow) 抛异常。
+function messageBox(opts) {
+  if (mainWindow && !mainWindow.isDestroyed()) return dialog.showMessageBox(mainWindow, opts);
+  return dialog.showMessageBox(opts);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 980,
@@ -86,7 +93,7 @@ function createWindow() {
 async function handleClose() {
   let behavior = settings.get('closeBehavior');
   if (!behavior) {
-    const r = await dialog.showMessageBox(mainWindow, {
+    const r = await messageBox({
       type: 'question',
       title: t('closeTitle'),
       message: t('closeMsg'),
@@ -173,7 +180,7 @@ async function checkForUpdates(manual) {
     const data = await httpsGetJson(RELEASE_API);
     const latest = String(data.tag_name || '').replace(/^v/i, '');
     if (compareVersions(latest, current) > 0) {
-      const r = await dialog.showMessageBox(mainWindow, {
+      const r = await messageBox({
         type: 'info',
         title: t('updateTitle'),
         message: t('updateMsg', latest, current),
@@ -184,11 +191,11 @@ async function checkForUpdates(manual) {
       });
       if (r.response === 0) shell.openExternal(RELEASE_PAGE);
     } else if (manual) {
-      await dialog.showMessageBox(mainWindow, { type: 'info', title: t('checkTitle'), message: t('upToDate', current) });
+      await messageBox({ type: 'info', title: t('checkTitle'), message: t('upToDate', current) });
     }
   } catch (e) {
     if (manual) {
-      await dialog.showMessageBox(mainWindow, { type: 'warning', title: t('checkTitle'), message: t('checkFailed') + (e.message || e) });
+      await messageBox({ type: 'warning', title: t('checkTitle'), message: t('checkFailed') + (e.message || e) });
     }
     // 非手动：静默失败，不打扰用户
   }

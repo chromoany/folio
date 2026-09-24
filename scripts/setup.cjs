@@ -7,6 +7,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 const VENDOR = path.resolve(__dirname, '..', 'vendor');
@@ -18,7 +19,8 @@ async function latestAsset(repo, re) {
   const rel = await r.json();
   const asset = (rel.assets || []).find((a) => re.test(a.name));
   if (!asset) throw new Error(`${repo} 未找到匹配 ${re} 的资产`);
-  return { version: rel.tag_name, id: asset.id, name: asset.name };
+  // GitHub API 自 2023 起为 release 资产提供 digest（形如 sha256:abcd…），用于下载后完整性校验
+  return { version: rel.tag_name, id: asset.id, name: asset.name, digest: asset.digest || null };
 }
 
 // 走 API 资产端点：会 302 到 release-assets CDN（部分网络下 github.com 主站被墙）
@@ -42,6 +44,22 @@ function extract(zip, dest) {
   }
 }
 
+// 下载后校验 sha256：与 GitHub 发布资产自带的 digest 比对，不一致立即中止并删除残留。
+// 这是本工具唯一的外部下载入口，不做完整性校验等于信任整条网络链路（含代理）。
+function verifyDigest(file, digest, key) {
+  if (!digest || !/^sha256:[0-9a-f]{64}$/i.test(digest)) {
+    console.warn(`[${key}] ⚠ 该发布未提供 sha256 digest，跳过完整性校验（建议人工核对）`);
+    return;
+  }
+  const actual = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  const expected = digest.split(':')[1].toLowerCase();
+  if (actual !== expected) {
+    fs.unlinkSync(file);
+    throw new Error(`[${key}] sha256 校验失败：期望 ${expected}，实际 ${actual}。文件已删除，请检查网络环境后重试`);
+  }
+  console.log(`[${key}] sha256 校验通过：${actual.slice(0, 16)}…`);
+}
+
 (async () => {
   fs.mkdirSync(VENDOR, { recursive: true });
   for (const [repo, re, key] of [
@@ -52,6 +70,7 @@ function extract(zip, dest) {
     console.log(`[${key}] ${a.version} (${a.name})`);
     const zip = path.join(VENDOR, `${key}.zip`);
     await downloadAsset(repo, a.id, zip);
+    verifyDigest(zip, a.digest, key);
     extract(zip, path.join(VENDOR, key));
     fs.unlinkSync(zip);
   }

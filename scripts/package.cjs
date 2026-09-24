@@ -141,9 +141,9 @@ async function pack() {
   const after = dirSize(APP_DIR);
   console.log(`⑤ 精简后安装体积: ${mb(after)}（省 ${mb(before - after)}）`);
 
-  // 步骤⑥ Inno Setup 出安装包
+  // 步骤⑥ Inno Setup 出安装包：版本号从 package.json 注入（单一来源），安装脚本内不再硬编码
   console.log('⑥ Inno Setup 编译安装包 …');
-  run(ISCC, [ISS], { cwd: ROOT });
+  run(ISCC, [`/DMyAppVersion=${VERSION}`, ISS], { cwd: ROOT });
   const exe = path.join(DIST_DIR, SETUP_EXE);
   if (!fs.existsSync(exe)) throw new Error('未找到安装包: ' + exe);
   console.log('完成: ' + exe + '（' + mb(fs.statSync(exe).size) + '），耗时 ' + ((Date.now() - t0) / 1000).toFixed(0) + 's');

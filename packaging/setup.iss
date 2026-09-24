@@ -1,4 +1,6 @@
-; Folio 1.7.3 —— Windows 安装脚本（Inno Setup 6）
+; Folio —— Windows 安装脚本（Inno Setup 6）
+; 版本号单一来源是 package.json：由 scripts/package.cjs 编译时经 ISCC /DMyAppVersion=x.y.z 注入。
+; 直接手跑 ISCC 时没有注入，会得到占位版本 0.0.0-dev（故意显眼，避免误发错误版本号的安装包）。
 ; v1.7.3 更新点：
 ;   * 修复：单独一行的 --- 被 Pandoc 误判成表格边框，把该段正文排成「一个字一行」的竖排
 ;     窄条（长内容还会溢出页面）；现识别并还原为正常正文
@@ -35,7 +37,10 @@
 ;   * （继承 1.4.1）关闭行为可配置、托盘、自动检查更新、独立桌面版、图标、快捷方式可选、始终可选安装目录
 ; 注：AppId 保持与旧版（mdbook/Folio）一致，便于从旧版平滑升级
 #define MyAppName "Folio"
-#define MyAppVersion "1.7.3"
+; 版本号由 package.cjs 经 ISCC /DMyAppVersion 注入，此处仅兜底
+#ifndef MyAppVersion
+  #define MyAppVersion "0.0.0-dev"
+#endif
 #define MyAppPublisher "chromoany"
 #define MyAppURL "https://github.com/chromoany/folio"
 
@@ -52,7 +57,7 @@ DefaultDirName={autopf}\folio
 DefaultGroupName=Folio
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=folio-1.7.3-setup
+OutputBaseFilename=folio-{#MyAppVersion}-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
