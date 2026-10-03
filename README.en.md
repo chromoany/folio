@@ -50,7 +50,7 @@ Merging multiple files is nothing special by itself — a one-line Pandoc comman
 
 ## Install
 
-Recommended: download `folio-1.7.8-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
+Recommended: download `folio-1.7.9-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
