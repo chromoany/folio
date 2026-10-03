@@ -203,6 +203,11 @@ async function handle(req, res) {
       const cliPath = require.resolve('../bin/folio.cjs');
       delete require.cache[cliPath];
       const fresh = require(cliPath);
+      // 行距：只收 Typst 长度（如 1em / 1.2em / 11pt），乱值直接拒绝，避免拼进排版模板
+      const leading = String(b.leading || '').trim();
+      if (leading && !/^\d+(\.\d+)?(em|pt|mm|cm|in)$/.test(leading)) {
+        throw new Error(L('行距格式不对，应为如 1em / 11pt 这样的长度', 'Invalid line spacing — use a length like 1em / 11pt'));
+      }
       const cfg = {
         inputs,
         output,
@@ -211,7 +216,7 @@ async function handle(req, res) {
         chapterBreak: b.chapterBreak !== false,
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-        font: { ...fresh.DEFAULTS.font }, // 字号/行距等默认值单一来源，别在这里再写一份
+        font: { ...fresh.DEFAULTS.font, ...(leading ? { leading } : {}) }, // 字号/行距默认值单一来源，别在这里再写一份
         lang: settings.get('language'), // 转换日志/错误提示随界面语言
       };
       const logs = [];

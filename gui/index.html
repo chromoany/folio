@@ -172,6 +172,15 @@
           <option value="4" data-i18n="toc4">4 级</option>
         </select>
       </div>
+      <div class="field"><label data-i18n="lblLeading">行距</label>
+        <select id="leading">
+          <option value="0.85em" data-i18n="leadTight">紧凑（0.85em）</option>
+          <option value="1em" selected data-i18n="leadNormal">标准（1em，默认）</option>
+          <option value="1.2em" data-i18n="leadLoose">宽松（1.2em）</option>
+          <option value="1.4em" data-i18n="leadXLoose">更宽松（1.4em）</option>
+        </select>
+        <div class="hint" data-i18n="leadingHint">影响 PDF 正文相邻两行的间距；任意值可用命令行 --leading（如 1.1em）。</div>
+      </div>
       <div class="field"><label data-i18n="lblOutput">输出 PDF 路径（留空则下载）</label><input type="text" id="output" data-i18n-ph="phOutput" placeholder="如 D:\...\书.pdf"></div>
       <div class="field full">
         <div class="checks">
@@ -251,6 +260,12 @@
       toc2: '2 级（章 + 节）',
       toc3: '3 级（章 + 节 + 小节）',
       toc4: '4 级',
+      lblLeading: '行距',
+      leadTight: '紧凑（0.85em）',
+      leadNormal: '标准（1em，默认）',
+      leadLoose: '宽松（1.2em）',
+      leadXLoose: '更宽松（1.4em）',
+      leadingHint: '影响 PDF 正文相邻两行的间距；任意值可用命令行 --leading（如 1.1em）。',
       lblOutput: '输出 PDF 路径（留空则下载）',
       phOutput: '如 D:\\...\\书.pdf',
       chkToc: '生成目录',
@@ -304,6 +319,12 @@
       toc2: 'Level 2 (chapters + sections)',
       toc3: 'Level 3 (chapters + sections + subsections)',
       toc4: 'Level 4',
+      lblLeading: 'Line spacing',
+      leadTight: 'Tight (0.85em)',
+      leadNormal: 'Normal (1em, default)',
+      leadLoose: 'Loose (1.2em)',
+      leadXLoose: 'Extra loose (1.4em)',
+      leadingHint: 'Affects the spacing between consecutive body lines in the PDF; use the CLI flag --leading (e.g. 1.1em) for an exact value.',
       lblOutput: 'Output PDF path (leave empty to download)',
       phOutput: 'e.g. D:\\...\\book.pdf',
       chkToc: 'Table of contents',
@@ -444,6 +465,7 @@
         title: document.getElementById('title').value.trim(),
         subtitle: document.getElementById('subtitle').value.trim(),
         tocDepth: Number(document.getElementById('tocDepth').value),
+        leading: document.getElementById('leading').value,
         toc: document.getElementById('toc').checked,
         chapterBreak: document.getElementById('chapterBreak').checked,
         output: document.getElementById('output').value.trim() || null,
