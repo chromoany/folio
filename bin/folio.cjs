@@ -323,9 +323,9 @@ function renderTemplate(cfg) {
   const h1Show = cfg.chapterBreak
     ? `#show heading.where(level: 1): it => [
   #pagebreak()
-  #block(above: 0em, below: 1.1 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#it]
+  #block(above: 0em, below: 1.5 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#it]
 ]`
-    : `#show heading.where(level: 1): it => block(above: 1.6 * {{LEADING}}, below: 1.1 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")), it)`;
+    : `#show heading.where(level: 1): it => block(above: 2.0 * {{LEADING}}, below: 1.5 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")), it)`;
 
   let titleBlock = '';
   if (cfg.title) {
