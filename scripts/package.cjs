@@ -83,12 +83,15 @@ async function pack() {
     /^\/dist($|\/)/, /^\/\.build($|\/)/, /^\/node_modules($|\/)/,
     /^\/examples($|\/)/, /^\/scripts($|\/)/, /^\/packaging($|\/)/,
     /^\/assets($|\/)/, /^\/\.git($|\/)/,
-    // temp/ 是本地临时产物目录（探针脚本、离线打包镜像等），绝不能进安装包：
+    // temp*/ 是本地临时产物目录（探针脚本、离线打包镜像、测试产物等），绝不能进安装包：
     // 曾因为它没被忽略，把两份 150MB 的 electron zip 一起打进 resources/app/temp/，安装包从 ~150MB 涨到 450MB
-    /^\/temp($|\/)/,
+    // 2026-10-03 再犯变体：temp-issue-1/（53MB 测试产物）和根目录游离 PDF 被卷进安装包，胖了 18MB
+    /^\/temp($|\/)/, /^\/temp-[^\/]*($|\/)/,
     /^\/README\.md$/, /^\/README\.zh\.md$/,
     /^\/\.gitignore$/, /^\/\.gitattributes$/,
     /^\/config\.example\.json$/,
+    // 本地杂项（agent 工作痕迹、游离转换产物）：运行时用不到，一律不带
+    /^\/\.zwork($|\/)/, /^\/AGENTS\.md$/, /^\/[^\/]*\.pdf$/,
   ];
   const appPaths = await packager({
     dir: ROOT,

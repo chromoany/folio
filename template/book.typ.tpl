@@ -35,9 +35,15 @@
 #show heading.where(level: 3): set text(size: 12pt)
 #show heading.where(level: 4): set text(size: 11pt)
 {{H1_SHOW}}
-#show heading.where(level: 2): it => block(above: 0.9em, below: 0.5em, it)
-#show heading.where(level: 3): it => block(above: 0.7em, below: 0.4em, it)
-#show heading.where(level: 4): it => block(above: 0.55em, below: 0.3em, it)
+// 标题样式：上下间距随行距（{{LEADING}}）联动 —— 只改 #set par(leading:) 不会动到这里，
+// 标题会一直保持旧间距（issue #1 反馈「哪怕选最大行距，标题还是很紧」）。
+// 系数为相对行距的倍数：1em 默认行距下 H2 上方 ≈ 16.8pt，行距调大调小同比缩放。
+// H5/H6 取 1.5/1.0 = Typst 默认值，保证默认行距下与历史输出一致。
+#show heading.where(level: 2): it => block(above: 1.6 * {{LEADING}}, below: 1.0 * {{LEADING}}, it)
+#show heading.where(level: 3): it => block(above: 1.3 * {{LEADING}}, below: 0.8 * {{LEADING}}, it)
+#show heading.where(level: 4): it => block(above: 1.0 * {{LEADING}}, below: 0.6 * {{LEADING}}, it)
+#show heading.where(level: 5): it => block(above: 1.5 * {{LEADING}}, below: 1.0 * {{LEADING}}, it)
+#show heading.where(level: 6): it => block(above: 1.5 * {{LEADING}}, below: 1.0 * {{LEADING}}, it)
 
 {{TITLE_BLOCK}}
 {{TOC_BLOCK}}

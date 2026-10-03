@@ -100,7 +100,7 @@ const HELP = `Folio —— Markdown → 书籍版式 PDF
   -c, --config <file>      配置文件（JSON）
   --title / --subtitle     书名 / 副标题
   --toc-depth <N>          目录列到几级标题（默认 3）
-  --leading <LEN>          行距（Typst 长度，默认 1em，如 0.85em / 1.2em）
+  --leading <LEN>          行距与标题上下间距（Typst 长度，默认 1em，如 0.85em / 1.2em）
   --no-toc                 不生成目录
   --no-chapter-break       每个 H1 不另起一页
   --pandoc-bin / --typst-bin  指定 pandoc / typst 二进制路径
@@ -319,12 +319,13 @@ function renderTemplate(cfg) {
   const f = cfg.font;
   const toc = cfg.toc;
 
+  // H1 的块间距同样随 font.leading 联动（{{LEADING}} 在 renderTemplate 末尾统一替换）
   const h1Show = cfg.chapterBreak
     ? `#show heading.where(level: 1): it => [
   #pagebreak()
-  #block(above: 0em, below: 0.7em, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#it]
+  #block(above: 0em, below: 1.1 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#it]
 ]`
-    : `#show heading.where(level: 1): it => block(above: 0.6em, below: 0.7em, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")), it)`;
+    : `#show heading.where(level: 1): it => block(above: 1.6 * {{LEADING}}, below: 1.1 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")), it)`;
 
   let titleBlock = '';
   if (cfg.title) {
@@ -343,14 +344,15 @@ function renderTemplate(cfg) {
     .replaceAll('{{MONO_FONT}}', strEsc(f.mono))
     .replaceAll('{{MONO_CJK}}', strEsc(f.monoCjk || 'NSimSun'))
     .replaceAll('{{BASE_SIZE}}', f.size)
-    .replaceAll('{{LEADING}}', strEsc(f.leading || '1em'))
     .replaceAll('{{MONO_SIZE}}', f.monoSize)
     .replaceAll('{{PAPER}}', p.paper)
     .replaceAll('{{MARGIN_X}}', p.marginX)
     .replaceAll('{{MARGIN_Y}}', p.marginY)
     .replaceAll('{{H1_SHOW}}', h1Show)
     .replaceAll('{{TITLE_BLOCK}}', titleBlock)
-    .replaceAll('{{TOC_BLOCK}}', tocBlock);
+    .replaceAll('{{TOC_BLOCK}}', tocBlock)
+    // {{LEADING}} 必须最后替换：H1_SHOW 等插入片段里也引用了它
+    .replaceAll('{{LEADING}}', strEsc(f.leading || '1em'));
 }
 
 function run(cmd, args, cwd, label, opts = {}) {
