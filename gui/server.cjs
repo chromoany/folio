@@ -199,6 +199,10 @@ async function handle(req, res) {
       const outBase = b.title ? safeName(b.title) : safeName(files[0].name.replace(/\.md$/i, ''));
       const output = b.output ? path.resolve(b.output) : path.join(runDir, outBase + '.pdf');
 
+      // 每次转换都重新加载最新 folio.cjs，避免旧服务驻留旧代码导致旧效果
+      const cliPath = require.resolve('../bin/folio.cjs');
+      delete require.cache[cliPath];
+      const fresh = require(cliPath);
       const cfg = {
         inputs,
         output,
@@ -207,12 +211,9 @@ async function handle(req, res) {
         chapterBreak: b.chapterBreak !== false,
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-        font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt' },
+        font: { ...fresh.DEFAULTS.font }, // 字号/行距等默认值单一来源，别在这里再写一份
         lang: settings.get('language'), // 转换日志/错误提示随界面语言
-      };      // 每次转换都重新加载最新 folio.cjs，避免旧服务驻留旧代码导致旧效果
-      const cliPath = require.resolve('../bin/folio.cjs');
-      delete require.cache[cliPath];
-      const fresh = require(cliPath);
+      };
       const logs = [];
       const r = fresh.build(cfg, { log: (m) => logs.push(m) });
       trackOpenable(r.output);

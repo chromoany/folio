@@ -50,7 +50,7 @@ Merging multiple files is nothing special by itself — a one-line Pandoc comman
 
 ## Install
 
-Recommended: download `folio-1.7.4-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
+Recommended: download `folio-1.7.5-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
@@ -72,7 +72,7 @@ node bin/folio.cjs ch1.md ch2.md -o book.pdf      # merge multiple files
 node bin/folio.cjs -c config.example.json         # use a config file
 ```
 
-Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
+Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--leading` (line spacing, default `1em`; try `1.2em` for a looser feel), `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
 
 ## Star History
 

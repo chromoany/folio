@@ -50,7 +50,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `folio-1.7.4-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。安装包未做代码签名，如首次运行遇到 SmartScreen 提示，点「更多信息 → 仍要运行」即可。
+推荐到 [Releases](../../releases) 下载 `folio-1.7.5-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。安装包未做代码签名，如首次运行遇到 SmartScreen 提示，点「更多信息 → 仍要运行」即可。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 
@@ -72,7 +72,7 @@ node bin/folio.cjs 第1章.md 第2章.md -o 书.pdf   # 多文件合并
 node bin/folio.cjs -c config.example.json        # 用配置文件
 ```
 
-常用参数：`--title` / `--subtitle` 书名副标题，`--toc-depth N` 目录深度，`--no-toc` 不生成目录，`--no-chapter-break` 一级标题不另起页，`--pandoc-bin` / `--typst-bin` 指定二进制路径。完整配置见 `config.example.json`。
+常用参数：`--title` / `--subtitle` 书名副标题，`--toc-depth N` 目录深度，`--leading` 行距（默认 `1em`，嫌挤可调 `1.2em`），`--no-toc` 不生成目录，`--no-chapter-break` 一级标题不另起页，`--pandoc-bin` / `--typst-bin` 指定二进制路径。完整配置见 `config.example.json`。
 
 ## Star 历史
 

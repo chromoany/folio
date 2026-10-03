@@ -1,6 +1,9 @@
 ; Folio —— Windows 安装脚本（Inno Setup 6）
 ; 版本号单一来源是 package.json：由 scripts/package.cjs 编译时经 ISCC /DMyAppVersion=x.y.z 注入。
 ; 直接手跑 ISCC 时没有注入，会得到占位版本 0.0.0-dev（故意显眼，避免误发错误版本号的安装包）。
+; v1.7.5 更新点：
+;   * 调整：正文行距默认值由 0.75em 放宽到 1em（10.5pt 字号下行距约 18.5pt），解决行距太紧凑；
+;     行距可经配置项 font.leading 或命令行 --leading 自定义（如 0.85em 收紧、1.2em 更松）
 ; v1.7.4 更新点：
 ;   * 安全：本地 GUI 服务增加请求来源校验（Host 白名单 + Origin 同源），堵死浏览器里
 ;     恶意网页对 127.0.0.1:4680 的跨源调用与 DNS rebinding；「打开文件 / 文件夹」

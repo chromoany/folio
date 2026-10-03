@@ -86,7 +86,7 @@ const DEFAULTS = {
   toc: { enabled: true, title: '目录', depth: 3 },
   chapterBreak: true,
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-  font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt' },
+  font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
 };
 
 const HELP = `Folio —— Markdown → 书籍版式 PDF
@@ -100,6 +100,7 @@ const HELP = `Folio —— Markdown → 书籍版式 PDF
   -c, --config <file>      配置文件（JSON）
   --title / --subtitle     书名 / 副标题
   --toc-depth <N>          目录列到几级标题（默认 3）
+  --leading <LEN>          行距（Typst 长度，默认 1em，如 0.85em / 1.2em）
   --no-toc                 不生成目录
   --no-chapter-break       每个 H1 不另起一页
   --pandoc-bin / --typst-bin  指定 pandoc / typst 二进制路径
@@ -278,6 +279,7 @@ function parseArgs(argv) {
     if (a === '-o' || a === '--output') flags.output = argv[++i];
     else if (a === '-c' || a === '--config') flags.config = argv[++i];
     else if (a === '--toc-depth') flags.tocDepth = Number(argv[++i]);
+    else if (a === '--leading') flags.leading = argv[++i];
     else if (a === '--no-toc') flags.noToc = true;
     else if (a === '--no-chapter-break') flags.noChapterBreak = true;
     else if (a === '--title') flags.title = argv[++i];
@@ -341,6 +343,7 @@ function renderTemplate(cfg) {
     .replaceAll('{{MONO_FONT}}', strEsc(f.mono))
     .replaceAll('{{MONO_CJK}}', strEsc(f.monoCjk || 'NSimSun'))
     .replaceAll('{{BASE_SIZE}}', f.size)
+    .replaceAll('{{LEADING}}', strEsc(f.leading || '1em'))
     .replaceAll('{{MONO_SIZE}}', f.monoSize)
     .replaceAll('{{PAPER}}', p.paper)
     .replaceAll('{{MARGIN_X}}', p.marginX)
@@ -454,6 +457,7 @@ function main() {
   if (inputs.length) cfg.inputs = inputs;
   if (flags.output) cfg.output = flags.output;
   if (flags.tocDepth) cfg.toc.depth = flags.tocDepth;
+  if (flags.leading) cfg.font.leading = flags.leading;
   if (flags.noToc) cfg.toc.enabled = false;
   if (flags.noChapterBreak) cfg.chapterBreak = false;
   if (flags.title) cfg.title = flags.title;
