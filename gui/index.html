@@ -467,7 +467,12 @@
     logEl.textContent = t('preparing');
     try {
       const payload = {
-        files: await Promise.all(files.map(async (f) => ({ name: f.name, content: await f.text() }))),
+        files: await Promise.all(files.map(async (f) => ({
+          name: f.name,
+          content: await f.text(),
+          // 真实路径（Electron 经 preload 提供）：本地图片按 md 原始目录解析，浏览器里为空
+          path: (window.folio && window.folio.getPathForFile) ? (window.folio.getPathForFile(f) || null) : null,
+        }))),
         title: document.getElementById('title').value.trim(),
         subtitle: document.getElementById('subtitle').value.trim(),
         tocDepth: Number(document.getElementById('tocDepth').value),

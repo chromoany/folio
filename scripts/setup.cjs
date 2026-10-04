@@ -60,6 +60,38 @@ function verifyDigest(file, digest, key) {
   console.log(`[${key}] sha256 校验通过：${actual.slice(0, 16)}…`);
 }
 
+// mermaid.js（桌面版渲染 mermaid 图用，vendor/mermaid/mermaid.min.js）：
+// 走 npm registry tarball，按 registry 元数据里的 integrity 校验后再解出 dist 文件
+const MERMAID_VERSION = '12.1.0';
+async function downloadMermaid(destDir) {
+  const metaRes = await fetch(`https://registry.npmjs.org/mermaid/${MERMAID_VERSION}`, { headers: UA });
+  if (!metaRes.ok) throw new Error(`mermaid 元数据请求失败：HTTP ${metaRes.status}`);
+  const meta = await metaRes.json();
+  const tarball = meta.dist && meta.dist.tarball;
+  const integrity = meta.dist && meta.dist.integrity; // 形如 sha512-BASE64
+  if (!tarball || !integrity) throw new Error('mermaid 元数据缺 tarball / integrity');
+
+  const tgz = path.join(VENDOR, 'mermaid.tgz');
+  const r = await fetch(tarball, { headers: UA, redirect: 'follow' });
+  if (!r.ok) throw new Error(`mermaid 下载失败：HTTP ${r.status}`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  const [algo, expectB64] = integrity.split('-', 2);
+  const actual = crypto.createHash(algo).update(buf).digest('base64');
+  if (actual !== expectB64) throw new Error(`mermaid ${algo} 校验失败：${actual.slice(0, 16)}… ≠ ${expectB64.slice(0, 16)}…`);
+  console.log(`[mermaid] ${MERMAID_VERSION} ${algo} 校验通过`);
+  fs.writeFileSync(tgz, buf);
+
+  const tmp = path.join(VENDOR, 'mermaid-extract');
+  fs.rmSync(tmp, { recursive: true, force: true });
+  extract(tgz, tmp);
+  const src = path.join(tmp, 'package', 'dist', 'mermaid.min.js');
+  if (!fs.existsSync(src)) throw new Error('mermaid 包里没有 dist/mermaid.min.js');
+  fs.mkdirSync(destDir, { recursive: true });
+  fs.copyFileSync(src, path.join(destDir, 'mermaid.min.js'));
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.unlinkSync(tgz);
+}
+
 (async () => {
   fs.mkdirSync(VENDOR, { recursive: true });
   for (const [repo, re, key] of [
@@ -74,5 +106,6 @@ function verifyDigest(file, digest, key) {
     extract(zip, path.join(VENDOR, key));
     fs.unlinkSync(zip);
   }
+  await downloadMermaid(path.join(VENDOR, 'mermaid'));
   console.log('完成。二进制已放入 vendor/');
 })().catch((e) => { console.error('出错：', e.message); process.exit(1); });

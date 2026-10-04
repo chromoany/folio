@@ -58,6 +58,9 @@ const MSG = {
     rawTex: (n) => `[folio] ${n} 段 LaTeX 命令按原文字面排版（typst 不支持 TeX）`,
     fetchedImages: (n) => `[folio] 联网抓取了 ${n} 张远程图片`,
     fetchFailed: (n, urls) => `[folio] ${n} 张远程图片抓取失败，已用占位文字替代${urls ? '：' + urls : ''}`,
+    mermaidRendered: (n) => `[folio] 渲染 ${n} 个 mermaid 图并嵌入 PDF`,
+    mermaidFailed: (n) => `[folio] ${n} 个 mermaid 图渲染失败（语法错误或超时），保留为代码块`,
+    mermaidSkipped: (n) => `[folio] ${n} 个 mermaid 代码块未渲染（mermaid 需要浏览器内核，命令行模式保留为代码块）`,
   },
   en: {
     noInput: 'No input files',
@@ -84,6 +87,9 @@ const MSG = {
     rawTex: (n) => `[folio] ${n} LaTeX snippet(s) rendered as literal text (typst does not support TeX)`,
     fetchedImages: (n) => `[folio] fetched ${n} remote image(s)`,
     fetchFailed: (n, urls) => `[folio] ${n} remote image(s) failed to fetch; replaced with placeholders${urls ? ': ' + urls : ''}`,
+    mermaidRendered: (n) => `[folio] rendered ${n} mermaid diagram(s) into the PDF`,
+    mermaidFailed: (n) => `[folio] ${n} mermaid diagram(s) failed to render (bad syntax or timeout); kept as code blocks`,
+    mermaidSkipped: (n) => `[folio] ${n} mermaid code block(s) not rendered (mermaid needs a browser engine; CLI keeps them as code blocks)`,
   },
 };
 
@@ -103,6 +109,7 @@ const DEFAULTS = {
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
   font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
   images: { fetchRemote: false }, // 远程图片默认不联网抓取（占位文字排版），抓取走 --fetch-remote-images
+  sourceDirs: [], // 相对图片的解析根：GUI 只传内容时带 md 原始目录；空 = 用 inputs 所在目录（CLI）
 };
 
 const HELP = `Folio —— Markdown → 书籍版式 PDF
@@ -459,7 +466,53 @@ async function fetchRemoteImages(bodyTyp, manifestFile, mediaDir, log) {
   return bodyTyp;
 }
 
-/** 执行完整转换。cfg 见 DEFAULTS，可额外带 pandocBin / typstBin。返回 { output, size, runDir } */
+// —— mermaid 代码块 → SVG 图（可选）———————————————————————————
+// 渲染需要浏览器内核（desktop/mermaid.cjs，只有 Electron 主进程有），由调用方经
+// cfg.renderMermaid 传入；没有渲染器就保留代码块并记日志，不打断转换。
+// 渲染出的 SVG 交给图片管线（内容嗅探为 svg、复制进转换目录）正常排版。
+async function extractMermaid(md, runDir, renderFn, counts) {
+  const lines = md.split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const open = /^(\s*)(`{3,}|~{3,})\s*mermaid\s*$/i.exec(lines[i]);
+    if (!open) {
+      out.push(lines[i]);
+      i += 1;
+      continue;
+    }
+    const fence = open[2];
+    const closeRe = new RegExp('^\\s*' + fence[0] + '{' + fence.length + ',}\\s*$');
+    let j = i + 1;
+    while (j < lines.length && !closeRe.test(lines[j])) j += 1;
+    const code = lines.slice(i + 1, j).join('\n');
+    const block = lines.slice(i, Math.min(j + 1, lines.length)); // 含开闭围栏，渲染失败时原样放回
+    i = j + 1;
+
+    let svg = null;
+    if (renderFn) {
+      try {
+        svg = await renderFn(code);
+      } catch (_) {
+        svg = null;
+      }
+    }
+    if (svg) {
+      counts.rendered += 1;
+      const file = path.join(runDir, 'mermaid-' + counts.rendered + '.svg');
+      fs.writeFileSync(file, svg, 'utf8');
+      // 尖括号目的地址：路径带空格/括号也安全；图片管线负责复制与正名
+      out.push('![](<' + file.replace(/\\/g, '/') + '>)');
+    } else {
+      if (renderFn) counts.failed += 1;
+      else counts.skipped += 1;
+      for (const l of block) out.push(l);
+    }
+  }
+  return out.join('\n');
+}
+
+/** 执行完整转换。cfg 见 DEFAULTS，可额外带 pandocBin / typstBin / renderMermaid（mermaid 渲染钩子）。返回 { output, size, runDir } */
 async function build(cfg, { log = () => {} } = {}) {
   UI_LANG = (cfg && cfg.lang === 'en') ? 'en' : 'zh';
   if (!cfg.inputs || !cfg.inputs.length) throw new Error(T('noInput'));
@@ -483,16 +536,23 @@ async function build(cfg, { log = () => {} } = {}) {
     else if (e.type === 'lists') stats.lists += e.count;
     else if (e.type === 'tables') stats.tables += e.count;
   };
-  const cleanedInputs = cfg.inputs.map((p, i) => {
-    let src = fs.readFileSync(p, 'utf8');
+  // mermaid 围栏先抽走（渲染成 SVG 图），再做清洗/补空行——它们自带围栏跳过逻辑
+  const mermaid = { rendered: 0, failed: 0, skipped: 0 };
+  const cleanedInputs = [];
+  for (let i = 0; i < cfg.inputs.length; i++) {
+    let src = fs.readFileSync(cfg.inputs[i], 'utf8');
     if (src.charCodeAt(0) === 0xfeff) src = src.slice(1);
+    src = await extractMermaid(src, runDir, cfg.renderMermaid, mermaid);
     const tmp = path.join(runDir, 'in-' + String(i).padStart(2, '0') + '.md');
     fs.writeFileSync(tmp, normalizeTables(normalizeLists(cleanMarkdown(src, note), note), note), 'utf8');
-    return tmp;
-  });
+    cleanedInputs.push(tmp);
+  }
 
   log(T('nFiles', cfg.inputs.length, outAbs));
   if (stats.toc) log(T('skipToc', stats.toc));
+  if (mermaid.rendered) log(T('mermaidRendered', mermaid.rendered));
+  if (mermaid.failed) log(T('mermaidFailed', mermaid.failed));
+  if (mermaid.skipped) log(T('mermaidSkipped', mermaid.skipped));
   if (stats.lists || stats.tables) {
     const parts = [];
     if (stats.lists) parts.push(T('padLists', stats.lists));
@@ -506,7 +566,10 @@ async function build(cfg, { log = () => {} } = {}) {
   const reportFile = path.join(runDir, 'filter-report.txt');
   const mediaDir = path.join(runDir, 'media');
   fs.mkdirSync(mediaDir, { recursive: true });
-  const srcDirs = [...new Set(cfg.inputs.map((p) => path.resolve(path.dirname(p))))].join(';');
+  // 相对图片按「原始 md 所在目录」解析：CLI 的 inputs 就是真实路径；GUI 只传内容，
+  // 靠 cfg.sourceDirs（Electron 传来的文件真实路径）定位，缺了就只能占位文字
+  const dirs = (cfg.sourceDirs && cfg.sourceDirs.length) ? cfg.sourceDirs : cfg.inputs.map((p) => path.dirname(p));
+  const srcDirs = [...new Set(dirs.map((d) => path.resolve(d)))].join(';');
   // 抓取远程图片才建清单：过滤器见 FOLIO_MEDIA_MANIFEST 存在才登记 URL，否则远程图走占位文字
   const fetchRemote = !!(cfg.images && cfg.images.fetchRemote);
   const manifestFile = path.join(runDir, 'media-manifest.tsv');

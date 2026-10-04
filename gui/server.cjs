@@ -15,6 +15,11 @@ const path = require('path');
 const { spawn, execSync } = require('child_process');
 const { build } = require('../bin/folio.cjs');
 const settings = require('../desktop/settings.js');
+const { getMermaidRenderer } = require('../desktop/mermaid.cjs');
+
+// mermaid 图渲染钩子：桌面版（本文件跑在 Electron 主进程）拿到浏览器内核渲染器；
+// 纯 node 直跑本服务时为 null，转换照常、mermaid 保留代码块并在日志提示
+const mermaidRender = getMermaidRenderer();
 
 const RUNS = path.join(settings.getBaseDir(), 'gui-runs');
 const PORT = Number(process.env.FOLIO_GUI_PORT || 4680);
@@ -218,6 +223,10 @@ async function handle(req, res) {
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
         font: { ...fresh.DEFAULTS.font, ...(leading ? { leading } : {}) }, // 字号/行距默认值单一来源，别在这里再写一份
         images: { fetchRemote: b.fetchRemote === true }, // 远程图片联网抓取（默认关，占位文字排版）
+        // 本地图片按 md 原始目录解析：Electron 经 preload 传真实路径（f.path），
+        // 浏览器拿不到路径时退回旧行为——图片以占位文字排版并在日志提示
+        sourceDirs: [...new Set(files.map((f) => (f.path ? path.dirname(path.resolve(String(f.path))) : null)).filter(Boolean))],
+        renderMermaid: mermaidRender || undefined, // mermaid 图渲染（桌面版才有，纯 node 保留代码块）
         lang: settings.get('language'), // 转换日志/错误提示随界面语言
       };
       const logs = [];
