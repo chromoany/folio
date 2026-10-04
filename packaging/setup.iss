@@ -1,6 +1,10 @@
 ; Folio —— Windows 安装脚本（Inno Setup 6）
 ; 版本号单一来源是 package.json：由 scripts/package.cjs 编译时经 ISCC /DMyAppVersion=x.y.z 注入。
 ; 直接手跑 ISCC 时没有注入，会得到占位版本 0.0.0-dev（故意显眼，避免误发错误版本号的安装包）。
+; v1.7.13 更新点：
+;   * 新增：mermaid 图的主题与连线样式改为界面可选（主题 5 档 / 连线 4 档），默认中性主题 + 圆润曲线
+;   * 变更：mermaid 流程图布局改用 dagre——mermaid v12 默认的 ELK 布局把连线强制成圆角折线、
+;     连线样式配置完全无效（上游 mermaid-js/mermaid#6193）；dagre 下连线才按所选样式插值
 ; v1.7.12 更新点：
 ;   * 修复：桌面版转换本地图片提示「图片缺失」——界面此前只上传 md 内容、丢了文件路径，
 ;     相对图片无从找起；现按 md 原始目录解析，图片放在 md 旁边 / 子目录里即正常排版

@@ -61,6 +61,8 @@ const MSG = {
     mermaidRendered: (n) => `[folio] 渲染 ${n} 个 mermaid 图并嵌入 PDF`,
     mermaidFailed: (n) => `[folio] ${n} 个 mermaid 图渲染失败（语法错误或超时），保留为代码块`,
     mermaidSkipped: (n) => `[folio] ${n} 个 mermaid 代码块未渲染（mermaid 需要浏览器内核，命令行模式保留为代码块）`,
+    badMermaidTheme: (v) => `未知的 mermaid 主题：${v}（可选：${MERMAID_THEMES.join(' / ')}）`,
+    badMermaidCurve: (v) => `未知的 mermaid 连线曲线：${v}（可选：${MERMAID_CURVES.join(' / ')}）`,
   },
   en: {
     noInput: 'No input files',
@@ -90,6 +92,8 @@ const MSG = {
     mermaidRendered: (n) => `[folio] rendered ${n} mermaid diagram(s) into the PDF`,
     mermaidFailed: (n) => `[folio] ${n} mermaid diagram(s) failed to render (bad syntax or timeout); kept as code blocks`,
     mermaidSkipped: (n) => `[folio] ${n} mermaid code block(s) not rendered (mermaid needs a browser engine; CLI keeps them as code blocks)`,
+    badMermaidTheme: (v) => `Unknown mermaid theme: ${v} (allowed: ${MERMAID_THEMES.join(' / ')})`,
+    badMermaidCurve: (v) => `Unknown mermaid line curve: ${v} (allowed: ${MERMAID_CURVES.join(' / ')})`,
   },
 };
 
@@ -109,8 +113,13 @@ const DEFAULTS = {
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
   font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
   images: { fetchRemote: false }, // 远程图片默认不联网抓取（占位文字排版），抓取走 --fetch-remote-images
+  mermaid: { theme: 'neutral', curve: 'basis' }, // mermaid 图的主题/连线曲线（口味型配置，界面可选；默认值单一来源，别在别处再写一份）
   sourceDirs: [], // 相对图片的解析根：GUI 只传内容时带 md 原始目录；空 = 用 inputs 所在目录（CLI）
 };
+
+// mermaid 主题与连线曲线的合法取值（mermaid 自身的取值集合；界面下拉给常用子集）
+const MERMAID_THEMES = ['default', 'base', 'neutral', 'forest', 'dark', 'null'];
+const MERMAID_CURVES = ['basis', 'linear', 'step', 'stepAfter', 'stepBefore', 'cardinal', 'catmullRom', 'monotoneX', 'monotoneY', 'natural', 'bumpX', 'bumpY'];
 
 const HELP = `Folio —— Markdown → 书籍版式 PDF
 
@@ -470,7 +479,7 @@ async function fetchRemoteImages(bodyTyp, manifestFile, mediaDir, log) {
 // 渲染需要浏览器内核（desktop/mermaid.cjs，只有 Electron 主进程有），由调用方经
 // cfg.renderMermaid 传入；没有渲染器就保留代码块并记日志，不打断转换。
 // 渲染出的 SVG 交给图片管线（内容嗅探为 svg、复制进转换目录）正常排版。
-async function extractMermaid(md, runDir, renderFn, counts) {
+async function extractMermaid(md, runDir, renderFn, counts, mermaidOpts) {
   const lines = md.split('\n');
   const out = [];
   let i = 0;
@@ -492,7 +501,7 @@ async function extractMermaid(md, runDir, renderFn, counts) {
     let svg = null;
     if (renderFn) {
       try {
-        svg = await renderFn(code);
+        svg = await renderFn(code, mermaidOpts); // mermaidOpts = { theme, curve }（口味型配置）
       } catch (_) {
         svg = null;
       }
@@ -517,6 +526,10 @@ async function build(cfg, { log = () => {} } = {}) {
   UI_LANG = (cfg && cfg.lang === 'en') ? 'en' : 'zh';
   if (!cfg.inputs || !cfg.inputs.length) throw new Error(T('noInput'));
   if (!cfg.output) cfg.output = cfg.inputs[0].replace(/\.md$/i, '') + '.pdf';
+  // mermaid 主题/连线曲线：缺省补默认值，乱值直接拒绝（避免拼进渲染配置）
+  cfg.mermaid = deepMerge(DEFAULTS.mermaid, cfg.mermaid || {});
+  if (!MERMAID_THEMES.includes(cfg.mermaid.theme)) throw new Error(T('badMermaidTheme', cfg.mermaid.theme));
+  if (!MERMAID_CURVES.includes(cfg.mermaid.curve)) throw new Error(T('badMermaidCurve', cfg.mermaid.curve));
 
   const pandocBin = findBin('pandoc', cfg.pandocBin);
   const typstBin = findBin('typst', cfg.typstBin);
@@ -542,7 +555,7 @@ async function build(cfg, { log = () => {} } = {}) {
   for (let i = 0; i < cfg.inputs.length; i++) {
     let src = fs.readFileSync(cfg.inputs[i], 'utf8');
     if (src.charCodeAt(0) === 0xfeff) src = src.slice(1);
-    src = await extractMermaid(src, runDir, cfg.renderMermaid, mermaid);
+    src = await extractMermaid(src, runDir, cfg.renderMermaid, mermaid, cfg.mermaid);
     const tmp = path.join(runDir, 'in-' + String(i).padStart(2, '0') + '.md');
     fs.writeFileSync(tmp, normalizeTables(normalizeLists(cleanMarkdown(src, note), note), note), 'utf8');
     cleanedInputs.push(tmp);
@@ -651,4 +664,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { build, renderTemplate, deepMerge, DEFAULTS };
+module.exports = { build, renderTemplate, deepMerge, DEFAULTS, MERMAID_THEMES, MERMAID_CURVES };

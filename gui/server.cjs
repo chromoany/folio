@@ -213,6 +213,15 @@ async function handle(req, res) {
       if (leading && !/^\d+(\.\d+)?(em|pt|mm|cm|in)$/.test(leading)) {
         throw new Error(L('行距格式不对，应为如 1em / 11pt 这样的长度', 'Invalid line spacing — use a length like 1em / 11pt'));
       }
+      // mermaid 图的主题/连线曲线：口味型配置，界面下拉选择；白名单外的值直接拒绝
+      const mermaidTheme = String(b.mermaidTheme || '').trim();
+      const mermaidCurve = String(b.mermaidCurve || '').trim();
+      if (mermaidTheme && !fresh.MERMAID_THEMES.includes(mermaidTheme)) {
+        throw new Error(L('不支持的 mermaid 主题：' + mermaidTheme, 'Unsupported mermaid theme: ' + mermaidTheme));
+      }
+      if (mermaidCurve && !fresh.MERMAID_CURVES.includes(mermaidCurve)) {
+        throw new Error(L('不支持的 mermaid 连线曲线：' + mermaidCurve, 'Unsupported mermaid line curve: ' + mermaidCurve));
+      }
       const cfg = {
         inputs,
         output,
@@ -222,6 +231,7 @@ async function handle(req, res) {
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
         font: { ...fresh.DEFAULTS.font, ...(leading ? { leading } : {}) }, // 字号/行距默认值单一来源，别在这里再写一份
+        mermaid: { ...fresh.DEFAULTS.mermaid, ...(mermaidTheme ? { theme: mermaidTheme } : {}), ...(mermaidCurve ? { curve: mermaidCurve } : {}) }, // mermaid 主题/连线曲线，同上
         images: { fetchRemote: b.fetchRemote === true }, // 远程图片联网抓取（默认关，占位文字排版）
         // 本地图片按 md 原始目录解析：Electron 经 preload 传真实路径（f.path），
         // 浏览器拿不到路径时退回旧行为——图片以占位文字排版并在日志提示

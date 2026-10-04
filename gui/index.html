@@ -181,6 +181,24 @@
         </select>
         <div class="hint" data-i18n="leadingHint">影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。</div>
       </div>
+      <div class="field"><label data-i18n="lblMermaidTheme">mermaid 图主题</label>
+        <select id="mermaidTheme">
+          <option value="default" data-i18n="mmThemeDefault">经典（default）</option>
+          <option value="neutral" selected data-i18n="mmThemeNeutral">中性（neutral，默认）</option>
+          <option value="forest" data-i18n="mmThemeForest">森林（forest）</option>
+          <option value="dark" data-i18n="mmThemeDark">暗色（dark）</option>
+          <option value="base" data-i18n="mmThemeBase">基础（base）</option>
+        </select>
+      </div>
+      <div class="field"><label data-i18n="lblMermaidCurve">mermaid 连线样式</label>
+        <select id="mermaidCurve">
+          <option value="basis" selected data-i18n="mmCurveBasis">圆润（basis，默认）</option>
+          <option value="linear" data-i18n="mmCurveLinear">直线（linear）</option>
+          <option value="step" data-i18n="mmCurveStep">直角折线（step）</option>
+          <option value="catmullRom" data-i18n="mmCurveSmooth">平滑（catmullRom）</option>
+        </select>
+        <div class="hint" data-i18n="mermaidHint">只影响文档里 mermaid 图的配色与连线走向；mermaid 图只在桌面版渲染进 PDF，命令行模式保留为代码块。</div>
+      </div>
       <div class="field"><label data-i18n="lblOutput">输出 PDF 路径（留空则下载）</label><input type="text" id="output" data-i18n-ph="phOutput" placeholder="如 D:\...\书.pdf"></div>
       <div class="field full">
         <div class="checks">
@@ -268,6 +286,18 @@
       leadLoose: '宽松（1.2em）',
       leadXLoose: '更宽松（1.4em）',
       leadingHint: '影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。',
+      lblMermaidTheme: 'mermaid 图主题',
+      mmThemeDefault: '经典（default）',
+      mmThemeNeutral: '中性（neutral，默认）',
+      mmThemeForest: '森林（forest）',
+      mmThemeDark: '暗色（dark）',
+      mmThemeBase: '基础（base）',
+      lblMermaidCurve: 'mermaid 连线样式',
+      mmCurveBasis: '圆润（basis，默认）',
+      mmCurveLinear: '直线（linear）',
+      mmCurveStep: '直角折线（step）',
+      mmCurveSmooth: '平滑（catmullRom）',
+      mermaidHint: '只影响文档里 mermaid 图的配色与连线走向；mermaid 图只在桌面版渲染进 PDF，命令行模式保留为代码块。',
       lblOutput: '输出 PDF 路径（留空则下载）',
       phOutput: '如 D:\\...\\书.pdf',
       chkToc: '生成目录',
@@ -329,6 +359,18 @@
       leadLoose: 'Loose (1.2em)',
       leadXLoose: 'Extra loose (1.4em)',
       leadingHint: 'Affects body line spacing and heading spacing in the PDF; use the CLI flag --leading (e.g. 1.1em) for an exact value.',
+      lblMermaidTheme: 'Mermaid diagram theme',
+      mmThemeDefault: 'Classic (default)',
+      mmThemeNeutral: 'Neutral (default)',
+      mmThemeForest: 'Forest',
+      mmThemeDark: 'Dark',
+      mmThemeBase: 'Base',
+      lblMermaidCurve: 'Mermaid line curve',
+      mmCurveBasis: 'Rounded (basis, default)',
+      mmCurveLinear: 'Straight (linear)',
+      mmCurveStep: 'Orthogonal (step)',
+      mmCurveSmooth: 'Smooth (catmullRom)',
+      mermaidHint: 'Only affects the colours and line curves of mermaid diagrams; the desktop app renders them into the PDF, while the CLI keeps them as code blocks.',
       lblOutput: 'Output PDF path (leave empty to download)',
       phOutput: 'e.g. D:\\...\\book.pdf',
       chkToc: 'Table of contents',
@@ -477,6 +519,8 @@
         subtitle: document.getElementById('subtitle').value.trim(),
         tocDepth: Number(document.getElementById('tocDepth').value),
         leading: document.getElementById('leading').value,
+        mermaidTheme: document.getElementById('mermaidTheme').value,
+        mermaidCurve: document.getElementById('mermaidCurve').value,
         toc: document.getElementById('toc').checked,
         chapterBreak: document.getElementById('chapterBreak').checked,
         fetchRemote: document.getElementById('fetchRemote').checked,
