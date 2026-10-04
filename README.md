@@ -20,6 +20,7 @@
 
 - 自动生成目录（含真实页码、可点击跳转）和页脚页码
 - Pandoc + Typst 引擎，公式、代码高亮、表格、列表原生支持，`mermaid` 图（流程图/时序图/饼图等）自动渲染成图嵌入（图的主题与连线样式可在转换选项里选择）
+- 字体三档可选（正文字体 / 英文字体 / 代码等宽字体，分类同 LaTeX 的 CJKmainfont / mainfont / ttfamily），逐档下拉、列出本机可用字体
 - 单文件 / 多文件合并（每个一级标题自动另起一页）
 - 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
 - 双语界面（简体中文 / English）：安装时可选语言，随时可在「设置」里切换
@@ -72,7 +73,7 @@ node bin/folio.cjs 第1章.md 第2章.md -o 书.pdf   # 多文件合并
 node bin/folio.cjs -c config.example.json        # 用配置文件
 ```
 
-常用参数：`--title` / `--subtitle` 书名副标题，`--toc-depth N` 目录深度，`--leading` 行距与标题上下间距（默认 `1em`，嫌挤可调 `1.2em`），`--no-toc` 不生成目录，`--no-chapter-break` 一级标题不另起页，`--pandoc-bin` / `--typst-bin` 指定二进制路径。完整配置见 `config.example.json`。
+常用参数：`--title` / `--subtitle` 书名副标题，`--toc-depth N` 目录深度，`--leading` 行距与标题上下间距（默认 `1em`，嫌挤可调 `1.2em`），`--font-cjk` / `--font-latin` / `--font-mono` 正文字体 / 英文字体 / 代码等宽字体（任意字族名，未安装会在日志提示），`--no-toc` 不生成目录，`--no-chapter-break` 一级标题不另起页，`--pandoc-bin` / `--typst-bin` 指定二进制路径。完整配置见 `config.example.json`。
 
 ## Star 历史
 

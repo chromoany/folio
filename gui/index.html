@@ -181,6 +181,16 @@
         </select>
         <div class="hint" data-i18n="leadingHint">影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。</div>
       </div>
+      <div class="field"><label data-i18n="lblFontCjk">正文字体（中文）</label>
+        <select id="fontCjk"><option value="Microsoft YaHei" selected>Microsoft YaHei</option></select>
+      </div>
+      <div class="field"><label data-i18n="lblFontLatin">英文字体（字母数字）</label>
+        <select id="fontLatin"><option value="" selected data-i18n="fontFollowCjk">跟随中文字体</option></select>
+      </div>
+      <div class="field"><label data-i18n="lblFontMono">代码等宽字体</label>
+        <select id="fontMono"><option value="Consolas" selected>Consolas</option></select>
+        <div class="hint" data-i18n="fontHint">三档字族分类同 LaTeX：中文（CJKmainfont）/ 西文（mainfont）/ 等宽（ttfamily）。列表取本机 typst 能用的字体，未安装的会标注并在转换日志里提示；任意字族名可用命令行 --font-cjk / --font-latin / --font-mono 或配置 font.cjk / font.latin / font.mono。</div>
+      </div>
       <div class="field"><label data-i18n="lblMermaidTheme">mermaid 图主题</label>
         <select id="mermaidTheme">
           <option value="default" data-i18n="mmThemeDefault">经典（default）</option>
@@ -286,6 +296,13 @@
       leadLoose: '宽松（1.2em）',
       leadXLoose: '更宽松（1.4em）',
       leadingHint: '影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。',
+      lblFontCjk: '正文字体（中文）',
+      lblFontLatin: '英文字体（字母数字）',
+      lblFontMono: '代码等宽字体',
+      fontFollowCjk: '跟随中文字体',
+      fontInstalledGroup: '其他已装字体',
+      fontMissingTag: '（未安装）',
+      fontHint: '三档字族分类同 LaTeX：中文（CJKmainfont）/ 西文（mainfont）/ 等宽（ttfamily）。列表取本机 typst 能用的字体，未安装的会标注并在转换日志里提示；任意字族名可用命令行 --font-cjk / --font-latin / --font-mono 或配置 font.cjk / font.latin / font.mono。',
       lblMermaidTheme: 'mermaid 图主题',
       mmThemeDefault: '经典（default）',
       mmThemeNeutral: '中性（neutral，默认）',
@@ -359,6 +376,13 @@
       leadLoose: 'Loose (1.2em)',
       leadXLoose: 'Extra loose (1.4em)',
       leadingHint: 'Affects body line spacing and heading spacing in the PDF; use the CLI flag --leading (e.g. 1.1em) for an exact value.',
+      lblFontCjk: 'Body font (Chinese)',
+      lblFontLatin: 'Latin font (letters & digits)',
+      lblFontMono: 'Monospace font (code)',
+      fontFollowCjk: 'Follow the Chinese font',
+      fontInstalledGroup: 'Other installed fonts',
+      fontMissingTag: ' (not installed)',
+      fontHint: 'Three families, classified like LaTeX: Chinese (CJKmainfont) / Latin (mainfont) / monospace (ttfamily). The lists come from the fonts typst can use on this machine; missing ones are marked and reported in the conversion log. Any family name works via --font-cjk / --font-latin / --font-mono or font.cjk / font.latin / font.mono in the config.',
       lblMermaidTheme: 'Mermaid diagram theme',
       mmThemeDefault: 'Classic (default)',
       mmThemeNeutral: 'Neutral (default)',
@@ -519,6 +543,9 @@
         subtitle: document.getElementById('subtitle').value.trim(),
         tocDepth: Number(document.getElementById('tocDepth').value),
         leading: document.getElementById('leading').value,
+        fontCjk: document.getElementById('fontCjk').value,
+        fontLatin: document.getElementById('fontLatin').value,
+        fontMono: document.getElementById('fontMono').value,
         mermaidTheme: document.getElementById('mermaidTheme').value,
         mermaidCurve: document.getElementById('mermaidCurve').value,
         toc: document.getElementById('toc').checked,
@@ -560,6 +587,61 @@
     result.appendChild(actions);
   }
 
+  // ---- 字体下拉（三档：中文 / 西文 / 等宽）----
+  // 常用项与默认值都来自服务端（bin/folio.cjs 单一来源），其余以本机「已装字族」分组补上；
+  // 接口取不到（如浏览器直开）就保留 html 里写死的默认项，转换照常。
+  let fontData = null;
+
+  function buildFontSelect(sel, list, installed, followOption) {
+    const keep = sel.value;
+    const seen = new Set();
+    const add = (parent, value, label) => {
+      if (seen.has(value)) return;
+      seen.add(value);
+      const o = document.createElement('option');
+      o.value = value;
+      o.textContent = label;
+      parent.appendChild(o);
+    };
+    sel.innerHTML = '';
+    if (followOption) add(sel, '', t('fontFollowCjk'));
+    const miss = installed ? t('fontMissingTag') : '';
+    // 当前值不在清单里也保留（别把用户的选择悄悄换掉），并标注未安装
+    if (keep && !(list || []).includes(keep)) add(sel, keep, keep + miss);
+    for (const name of list || []) add(sel, name, installed && !installed.has(name) ? name + miss : name);
+    if (installed) {
+      const rest = [...installed].filter((n) => !seen.has(n)).sort((a, b) => a.localeCompare(b));
+      if (rest.length) {
+        const g = document.createElement('optgroup');
+        g.label = t('fontInstalledGroup');
+        for (const n of rest) add(g, n, n);
+        sel.appendChild(g);
+      }
+    }
+    sel.value = seen.has(keep) ? keep : (followOption ? '' : ((list && list[0]) || ''));
+  }
+
+  function renderFontSelects() {
+    const installed = fontData && Array.isArray(fontData.installed) ? new Set(fontData.installed) : null;
+    const choices = (fontData && fontData.choices) || {};
+    const bind = [['fontCjk', 'cjk', false], ['fontLatin', 'latin', true], ['fontMono', 'mono', false]];
+    for (const [id, key, followOption] of bind) {
+      const sel = document.getElementById(id);
+      if (sel) buildFontSelect(sel, choices[key], installed, followOption);
+    }
+  }
+
+  async function loadFonts() {
+    if (!fontData) {
+      try {
+        const r = await fetch('/api/fonts');
+        const j = await r.json();
+        if (j && j.ok) fontData = j;
+      } catch (_) {}
+    }
+    if (fontData) renderFontSelects();
+  }
+
   // ---- 设置弹窗 ----
   const settingsMask = document.getElementById('settingsMask');
   const settingsBtn = document.getElementById('settingsBtn');
@@ -591,6 +673,7 @@
     const v = langSel.value === 'en' ? 'en' : 'zh';
     await postSettings({ language: v });
     applyLang(v);
+    if (fontData) renderFontSelects(); // 重刷字体下拉的分组名与「未安装」标注（跟随当前语言）
     if (window.folio && window.folio.setLanguage) window.folio.setLanguage(v);
   });
 
@@ -617,6 +700,7 @@
     if (!savedTheme) { try { savedTheme = localStorage.getItem(THEME_KEY); } catch (_) {} }
     applyTheme(savedTheme, false);   // 服务端设置为准，取不到时沿用首屏脚本用过的缓存值
     applyLang(cur);
+    await loadFonts();               // 字体下拉：默认项 + 本机已装字族（接口失败就保持默认项）
   })();
 })();
 </script>

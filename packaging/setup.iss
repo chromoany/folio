@@ -1,6 +1,14 @@
 ; Folio —— Windows 安装脚本（Inno Setup 6）
 ; 版本号单一来源是 package.json：由 scripts/package.cjs 编译时经 ISCC /DMyAppVersion=x.y.z 注入。
 ; 直接手跑 ISCC 时没有注入，会得到占位版本 0.0.0-dev（故意显眼，避免误发错误版本号的安装包）。
+; v1.7.14 更新点：
+;   * 修复：v1.7.13 起 mermaid 图完全不渲染（渲染脚本少了一个右花括号导致每次都语法错误，
+;     且注入整包时的返回值无法跨进程克隆，渲染器启动即失败）；现两处均已修复并加了发版前自检
+;   * 修复：mermaid 渲染失败时日志给出具体原因，不再只报「渲染失败」
+;   * 新增：字体三档可选（正文字体 / 英文字体 / 代码等宽字体，分类同 LaTeX 的
+;     CJKmainfont / mainfont / ttfamily）——界面下拉列出本机可用字体，命令行
+;     --font-cjk / --font-latin / --font-mono、配置 font.cjk / font.latin / font.mono 同源；
+;     所选字体未安装时在转换日志里提示
 ; v1.7.13 更新点：
 ;   * 新增：mermaid 图的主题与连线样式改为界面可选（主题 5 档 / 连线 4 档），默认中性主题 + 圆润曲线
 ;   * 变更：mermaid 流程图布局改用 dagre——mermaid v12 默认的 ELK 布局把连线强制成圆角折线、

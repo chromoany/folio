@@ -4,3 +4,5 @@ vendor/
 node_modules/
 dist/
 temp/
+# 本地临时工作目录一律 temp-<主题>/（诊断脚本、测试产物）；曾因没被忽略而被打进安装包
+/temp-*/

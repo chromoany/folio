@@ -76,6 +76,10 @@ function findUpx() {
 
 async function pack() {
   const t0 = Date.now();
+  // ⓪ 发版前静态自检：挡住「运行时才炸、现象含糊」的低级错误（mermaid 脚本解析、模板占位符等）
+  console.log('⓪ 自检 …');
+  if (!require('./selfcheck.cjs').run()) throw new Error('自检未通过，已中止打包（详见上方 ✗ 项）');
+
   console.log('① electron-packager …');
   const { packager } = require('@electron/packager');
   rmrf(APP_DIR);

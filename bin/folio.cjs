@@ -60,9 +60,13 @@ const MSG = {
     fetchFailed: (n, urls) => `[folio] ${n} 张远程图片抓取失败，已用占位文字替代${urls ? '：' + urls : ''}`,
     mermaidRendered: (n) => `[folio] 渲染 ${n} 个 mermaid 图并嵌入 PDF`,
     mermaidFailed: (n) => `[folio] ${n} 个 mermaid 图渲染失败（语法错误或超时），保留为代码块`,
+    mermaidReason: (v) => `[folio] mermaid 渲染失败原因：${v}`,
+    mermaidForeignObject: (n) => `[folio] ${n} 个 mermaid 图的文字走 HTML 渲染（typst 不支持 foreignObject，图内文字可能缺失，如 journey 图）`,
     mermaidSkipped: (n) => `[folio] ${n} 个 mermaid 代码块未渲染（mermaid 需要浏览器内核，命令行模式保留为代码块）`,
     badMermaidTheme: (v) => `未知的 mermaid 主题：${v}（可选：${MERMAID_THEMES.join(' / ')}）`,
     badMermaidCurve: (v) => `未知的 mermaid 连线曲线：${v}（可选：${MERMAID_CURVES.join(' / ')}）`,
+    fontMissing: (v) => `[folio] 字体未安装，排版会回退到替代字体：${v}`,
+    badFont: (v) => `字体名不合法：${v}（不能含引号、反斜杠或换行）`,
   },
   en: {
     noInput: 'No input files',
@@ -91,9 +95,13 @@ const MSG = {
     fetchFailed: (n, urls) => `[folio] ${n} remote image(s) failed to fetch; replaced with placeholders${urls ? ': ' + urls : ''}`,
     mermaidRendered: (n) => `[folio] rendered ${n} mermaid diagram(s) into the PDF`,
     mermaidFailed: (n) => `[folio] ${n} mermaid diagram(s) failed to render (bad syntax or timeout); kept as code blocks`,
+    mermaidReason: (v) => `[folio] mermaid render error: ${v}`,
+    mermaidForeignObject: (n) => `[folio] ${n} mermaid diagram(s) put labels in HTML (foreignObject), which typst cannot render — their text may be missing (e.g. journey)`,
     mermaidSkipped: (n) => `[folio] ${n} mermaid code block(s) not rendered (mermaid needs a browser engine; CLI keeps them as code blocks)`,
     badMermaidTheme: (v) => `Unknown mermaid theme: ${v} (allowed: ${MERMAID_THEMES.join(' / ')})`,
     badMermaidCurve: (v) => `Unknown mermaid line curve: ${v} (allowed: ${MERMAID_CURVES.join(' / ')})`,
+    fontMissing: (v) => `[folio] font not installed — typesetting falls back to a substitute: ${v}`,
+    badFont: (v) => `Invalid font family: ${v} (quotes, backslashes and newlines are not allowed)`,
   },
 };
 
@@ -111,7 +119,7 @@ const DEFAULTS = {
   toc: { enabled: true, title: '目录', depth: 3 },
   chapterBreak: true,
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-  font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
+  font: { cjk: 'Microsoft YaHei', latin: '', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
   images: { fetchRemote: false }, // 远程图片默认不联网抓取（占位文字排版），抓取走 --fetch-remote-images
   mermaid: { theme: 'neutral', curve: 'basis' }, // mermaid 图的主题/连线曲线（口味型配置，界面可选；默认值单一来源，别在别处再写一份）
   sourceDirs: [], // 相对图片的解析根：GUI 只传内容时带 md 原始目录；空 = 用 inputs 所在目录（CLI）
@@ -120,6 +128,39 @@ const DEFAULTS = {
 // mermaid 主题与连线曲线的合法取值（mermaid 自身的取值集合；界面下拉给常用子集）
 const MERMAID_THEMES = ['default', 'base', 'neutral', 'forest', 'dark', 'null'];
 const MERMAID_CURVES = ['basis', 'linear', 'step', 'stepAfter', 'stepBefore', 'cardinal', 'catmullRom', 'monotoneX', 'monotoneY', 'natural', 'bumpX', 'bumpY'];
+
+// 字体三档（按字族用途分类，口径与 LaTeX 一致）：cjk = 中文字族（≈ CJKmainfont），
+// latin = 西文字族（≈ mainfont，只管字母数字），mono = 代码等宽字族（≈ ttfamily）。
+// 下面只是界面下拉的「常用」清单（单一来源：GUI 经 /api/fonts 取，别在 html 里再抄一份）；
+// 已装字体由 /api/fonts 动态补全，CLI / 配置文件可写任意字族名（写错会在日志里报未安装并回退）。
+const FONT_CHOICES = {
+  cjk: ['Microsoft YaHei', 'SimSun', 'SimHei', 'KaiTi', 'FangSong', 'DengXian', 'NSimSun', 'Noto Serif SC', 'Noto Sans SC', 'Source Han Serif SC', 'Source Han Sans SC', 'STSong', 'STKaiti', 'YouYuan'],
+  latin: ['Times New Roman', 'Cambria', 'Georgia', 'Garamond', 'Palatino Linotype', 'Book Antiqua', 'Arial', 'Segoe UI', 'Calibri', 'Verdana', 'Tahoma'],
+  mono: ['Consolas', 'Cascadia Code', 'Cascadia Mono', 'JetBrains Mono', 'Courier New', 'Lucida Console', 'NSimSun', 'Fira Code', 'Source Code Pro'],
+};
+
+// 已装字族清单（`typst fonts`）按二进制路径缓存：一进程只查一次。
+// 受限沙箱里管道 stdio 会 EPERM，此时拿不到输出 —— 返回 null 表示「查不到」，别据此误报缺失。
+const fontCache = new Map();
+function installedFonts(typstBin) {
+  const key = String(typstBin);
+  if (fontCache.has(key)) return fontCache.get(key);
+  let set = null;
+  try {
+    const r = spawnSync(typstBin, ['fonts'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (!r.error && r.status === 0 && typeof r.stdout === 'string' && r.stdout.trim()) {
+      set = new Set(r.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean));
+    }
+  } catch (_) { set = null; }
+  fontCache.set(key, set);
+  return set;
+}
+
+/** 已装字族清单（GUI 下拉用，排序后的数组）：查不到返回 null */
+function listFonts(typstBin) {
+  const set = installedFonts(typstBin || findBin('typst', null));
+  return set ? [...set].sort((a, b) => a.localeCompare(b)) : null;
+}
 
 const HELP = `Folio —— Markdown → 书籍版式 PDF
 
@@ -133,6 +174,9 @@ const HELP = `Folio —— Markdown → 书籍版式 PDF
   --title / --subtitle     书名 / 副标题
   --toc-depth <N>          目录列到几级标题（默认 3）
   --leading <LEN>          行距与标题上下间距（Typst 长度，默认 1em，如 0.85em / 1.2em）
+  --font-cjk <字族>        正文字体（中文），默认 Microsoft YaHei，如 SimSun / KaiTi / Noto Serif SC
+  --font-latin <字族>      西文字体（字母数字），默认跟随中文字体，如 Times New Roman
+  --font-mono <字族>       代码等宽字体，默认 Consolas，如 Cascadia Code / JetBrains Mono
   --fetch-remote-images    联网抓取远程图片（默认不抓取，远程图以占位文字排版）
   --no-fetch-remote-images 不抓取远程图片（覆盖配置文件）
   --no-toc                 不生成目录
@@ -314,6 +358,9 @@ function parseArgs(argv) {
     else if (a === '-c' || a === '--config') flags.config = argv[++i];
     else if (a === '--toc-depth') flags.tocDepth = Number(argv[++i]);
     else if (a === '--leading') flags.leading = argv[++i];
+    else if (a === '--font-cjk') flags.fontCjk = argv[++i];
+    else if (a === '--font-latin') flags.fontLatin = argv[++i];
+    else if (a === '--font-mono') flags.fontMono = argv[++i];
     else if (a === '--fetch-remote-images') flags.fetchRemote = true;
     else if (a === '--no-fetch-remote-images') flags.fetchRemote = false;
     else if (a === '--no-toc') flags.noToc = true;
@@ -374,9 +421,16 @@ function renderTemplate(cfg) {
     ? `#block(above: 0.6em, below: 0.5em, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#text(size: 16pt, weight: "bold")[${contEsc(toc.title)}]]\n#outline(title: none, indent: auto, depth: ${toc.depth})`
     : '';
 
+  // 字体链：西文字族（可选）→ 中文字族 → SimSun 兜底。Typst 按字形逐个回退：字母数字走第一个
+  // 装得上的字族，汉字落到中文字族。latin 留空（默认）时链与旧版完全一致 —— 输出逐字节不变。
+  const fontStack = [];
+  if (f.latin && f.latin !== f.cjk) fontStack.push('"' + strEsc(f.latin) + '"');
+  fontStack.push('"' + strEsc(f.cjk) + '"', '"SimSun"');
+
   return tpl
     .replaceAll('{{DOC_TITLE}}', strEsc(cfg.title))
-    .replaceAll('{{CJK_FONT}}', strEsc(f.cjk))
+    .replaceAll('{{FONT_STACK}}', fontStack.join(', '))
+    .replaceAll('{{CJK_FONT}}', strEsc(f.cjk)) // 兼容手改过的旧模板（老占位符留着无害）
     .replaceAll('{{MONO_FONT}}', strEsc(f.mono))
     .replaceAll('{{MONO_CJK}}', strEsc(f.monoCjk || 'NSimSun'))
     .replaceAll('{{BASE_SIZE}}', f.size)
@@ -501,8 +555,16 @@ async function extractMermaid(md, runDir, renderFn, counts, mermaidOpts) {
     let svg = null;
     if (renderFn) {
       try {
-        svg = await renderFn(code, mermaidOpts); // mermaidOpts = { theme, curve }（口味型配置）
-      } catch (_) {
+        const r = await renderFn(code, mermaidOpts); // mermaidOpts = { theme, curve }（口味型配置）
+        // 渲染钩子返回 { svg, error }（desktop/mermaid.cjs）；也兼容直接返回 SVG 字符串的老钩子
+        if (typeof r === 'string') svg = r;
+        else if (r && typeof r === 'object') {
+          svg = r.svg || null;
+          if (!svg && r.error && !counts.lastError) counts.lastError = String(r.error);
+          if (svg && r.foreignObject) counts.htmlLabels += 1;
+        }
+      } catch (e) {
+        if (!counts.lastError) counts.lastError = String((e && e.message) || e);
         svg = null;
       }
     }
@@ -534,6 +596,21 @@ async function build(cfg, { log = () => {} } = {}) {
   const pandocBin = findBin('pandoc', cfg.pandocBin);
   const typstBin = findBin('typst', cfg.typstBin);
 
+  // 字族名会被插进 Typst 模板的字符串字面量：引号/反斜杠/换行会破坏模板 —— 命令行与配置文件
+  // 同样要拦（界面那侧另有一道更早的校验，为了让错误直接回到界面上）
+  for (const val of Object.values(cfg.font)) {
+    if (typeof val === 'string' && /["\\\r\n\t]/.test(val)) throw new Error(T('badFont', val));
+  }
+
+  // 字体可用性：选了系统没装的字族，typst 只在 stderr 里 warning（Folio 不回显 typst 的 warning），
+  // 排版会静默换成别的字体 —— 与「选了没生效」的观感完全一样。这里查一次已装清单并点明缺失项
+  //（日志放到文件行之后再打，免得警示语跑到「输入 N 个文件」前面）。
+  const installed = installedFonts(typstBin);
+  const missingFonts = installed
+    ? [...new Set([cfg.font.cjk, cfg.font.latin, cfg.font.mono, cfg.font.monoCjk].filter(Boolean))]
+      .filter((name) => !installed.has(name))
+    : [];
+
   const runDir = path.join(TMP, 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6));
   fs.mkdirSync(runDir, { recursive: true });
   const bodyFile = path.join(runDir, 'body.typ');
@@ -550,7 +627,7 @@ async function build(cfg, { log = () => {} } = {}) {
     else if (e.type === 'tables') stats.tables += e.count;
   };
   // mermaid 围栏先抽走（渲染成 SVG 图），再做清洗/补空行——它们自带围栏跳过逻辑
-  const mermaid = { rendered: 0, failed: 0, skipped: 0 };
+  const mermaid = { rendered: 0, failed: 0, skipped: 0, htmlLabels: 0, lastError: '' };
   const cleanedInputs = [];
   for (let i = 0; i < cfg.inputs.length; i++) {
     let src = fs.readFileSync(cfg.inputs[i], 'utf8');
@@ -562,9 +639,13 @@ async function build(cfg, { log = () => {} } = {}) {
   }
 
   log(T('nFiles', cfg.inputs.length, outAbs));
+  if (missingFonts.length) log(T('fontMissing', missingFonts.join(' / ')));
   if (stats.toc) log(T('skipToc', stats.toc));
   if (mermaid.rendered) log(T('mermaidRendered', mermaid.rendered));
   if (mermaid.failed) log(T('mermaidFailed', mermaid.failed));
+  // 失败原因只报第一条：同因多处失败时逐条刷屏没意义，而「只说失败不说为什么」排查不动
+  if (mermaid.failed && mermaid.lastError) log(T('mermaidReason', mermaid.lastError.slice(0, 200)));
+  if (mermaid.htmlLabels) log(T('mermaidForeignObject', mermaid.htmlLabels));
   if (mermaid.skipped) log(T('mermaidSkipped', mermaid.skipped));
   if (stats.lists || stats.tables) {
     const parts = [];
@@ -644,6 +725,9 @@ async function main() {
   if (flags.output) cfg.output = flags.output;
   if (flags.tocDepth) cfg.toc.depth = flags.tocDepth;
   if (flags.leading) cfg.font.leading = flags.leading;
+  if (flags.fontCjk) cfg.font.cjk = flags.fontCjk;
+  if (flags.fontLatin !== undefined) cfg.font.latin = flags.fontLatin;
+  if (flags.fontMono) cfg.font.mono = flags.fontMono;
   if (flags.fetchRemote !== undefined) cfg.images.fetchRemote = flags.fetchRemote;
   if (flags.noToc) cfg.toc.enabled = false;
   if (flags.noChapterBreak) cfg.chapterBreak = false;
@@ -664,4 +748,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { build, renderTemplate, deepMerge, DEFAULTS, MERMAID_THEMES, MERMAID_CURVES };
+module.exports = { build, renderTemplate, deepMerge, DEFAULTS, MERMAID_THEMES, MERMAID_CURVES, FONT_CHOICES, listFonts };

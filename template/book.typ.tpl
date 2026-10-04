@@ -1,6 +1,9 @@
 // 由 Folio 生成（勿手改）：Markdown → 书籍版式 PDF 的 Typst 布局模板
 #set document(title: "{{DOC_TITLE}}")
-#set text(font: ("{{CJK_FONT}}", "SimSun"), size: {{BASE_SIZE}}, lang: "zh")
+// 正文/标题字体链，按字族用途分三档（口径同 LaTeX）：{{FONT_STACK}} = 西文字族（可选）、中文字族、
+// SimSun 兜底。Typst 按字形逐个向后回退：字母数字走西文字族，汉字落到中文字族。
+// 对应用户可配的三项：font.cjk（≈ CJKmainfont）/ font.latin（≈ mainfont）/ font.mono（≈ ttfamily）。
+#set text(font: ({{FONT_STACK}}), size: {{BASE_SIZE}}, lang: "zh")
 #set par(leading: {{LEADING}})
 
 #set page(

@@ -95,6 +95,25 @@ function safeName(n) {
   return b.replace(/[\\/:*?"<>|]/g, '_').slice(0, 120) || 'input.md';
 }
 
+// 字体名会被插进 Typst 模板的字符串字面量：禁引号/反斜杠/换行/控制字符并限长。
+// 空串 = 用默认值（英文字体留空还有「跟随中文字体」的语义，调用方据此决定要不要覆盖）。
+function safeFont(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  // eslint-disable-next-line no-control-regex
+  if (s.length > 80 || /["\\\r\n\t\u0000-\u001f]/.test(s)) {
+    throw new Error(L('字体名不合法：' + s, 'Invalid font family: ' + s));
+  }
+  return s;
+}
+
+// 转换与 /api/fonts 都要读 bin/folio.cjs：每次重新 require，避免长驻服务用旧代码（DEFAULTS 单一来源）
+function freshCli() {
+  const cliPath = require.resolve('../bin/folio.cjs');
+  delete require.cache[cliPath];
+  return require(cliPath);
+}
+
 function openPath(p) {
   // start 的第一个参数是窗口标题，必须留一个空字符串占位；路径里的引号一律去掉，防 cmd 元字符注入
   spawn('cmd', ['/c', 'start', '', String(p).replace(/"/g, '')], { stdio: 'ignore', detached: true, windowsHide: true }).unref();
@@ -159,6 +178,21 @@ async function handle(req, res) {
       return;
     }
 
+    if (req.method === 'GET' && u.pathname === '/api/fonts') {
+      // 字体三档的候选清单：常用项（FONT_CHOICES）+ 已装字族（`typst fonts` 现查，成功一次即缓存）。
+      // 查不到时 installed = null，界面只用常用项 + 默认值，不影响转换。
+      const fresh = freshCli();
+      let installed = null;
+      try { installed = fresh.listFonts(); } catch (_) { installed = null; }
+      sendJson(res, 200, {
+        ok: true,
+        installed,
+        choices: fresh.FONT_CHOICES,
+        defaults: fresh.DEFAULTS.font,
+      });
+      return;
+    }
+
     if (req.method === 'POST' && u.pathname === '/api/settings') {
       const b = await readBody(req);
       if (b.closeBehavior !== undefined) {
@@ -205,9 +239,7 @@ async function handle(req, res) {
       const output = b.output ? path.resolve(b.output) : path.join(runDir, outBase + '.pdf');
 
       // 每次转换都重新加载最新 folio.cjs，避免旧服务驻留旧代码导致旧效果
-      const cliPath = require.resolve('../bin/folio.cjs');
-      delete require.cache[cliPath];
-      const fresh = require(cliPath);
+      const fresh = freshCli();
       // 行距：只收 Typst 长度（如 1em / 1.2em / 11pt），乱值直接拒绝，避免拼进排版模板
       const leading = String(b.leading || '').trim();
       if (leading && !/^\d+(\.\d+)?(em|pt|mm|cm|in)$/.test(leading)) {
@@ -222,6 +254,10 @@ async function handle(req, res) {
       if (mermaidCurve && !fresh.MERMAID_CURVES.includes(mermaidCurve)) {
         throw new Error(L('不支持的 mermaid 连线曲线：' + mermaidCurve, 'Unsupported mermaid line curve: ' + mermaidCurve));
       }
+      // 字体三档（中文 / 西文 / 等宽）：只为合法性把关，是否装机由 build() 查已装清单后在日志里提示
+      const fontCjk = safeFont(b.fontCjk);
+      const fontLatin = safeFont(b.fontLatin);
+      const fontMono = safeFont(b.fontMono);
       const cfg = {
         inputs,
         output,
@@ -230,7 +266,13 @@ async function handle(req, res) {
         chapterBreak: b.chapterBreak !== false,
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-        font: { ...fresh.DEFAULTS.font, ...(leading ? { leading } : {}) }, // 字号/行距默认值单一来源，别在这里再写一份
+        font: {
+          ...fresh.DEFAULTS.font, // 字号/行距/字体默认值单一来源，别在这里再写一份
+          ...(leading ? { leading } : {}),
+          ...(fontCjk ? { cjk: fontCjk } : {}),
+          ...(fontLatin ? { latin: fontLatin } : {}),
+          ...(fontMono ? { mono: fontMono } : {}),
+        },
         mermaid: { ...fresh.DEFAULTS.mermaid, ...(mermaidTheme ? { theme: mermaidTheme } : {}), ...(mermaidCurve ? { curve: mermaidCurve } : {}) }, // mermaid 主题/连线曲线，同上
         images: { fetchRemote: b.fetchRemote === true }, // 远程图片联网抓取（默认关，占位文字排版）
         // 本地图片按 md 原始目录解析：Electron 经 preload 传真实路径（f.path），

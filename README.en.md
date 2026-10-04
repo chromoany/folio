@@ -20,6 +20,7 @@ Convert Markdown files into a **book-style PDF** with a table of contents and pa
 
 - Auto-generated table of contents (real page numbers, clickable) and page-numbered footer
 - Pandoc + Typst engine: math, syntax highlighting, tables, and lists work natively; `mermaid` diagrams (flowcharts, sequence, pie, …) are rendered into the PDF (diagram theme and line style are selectable in the conversion options)
+- Three font families selectable (body / Latin / monospace, classified like LaTeX's CJKmainfont / mainfont / ttfamily); each dropdown lists the fonts available on this machine
 - Single file or merge multiple files (each H1 starts on a new page)
 - Standalone desktop app: bundled Chromium, no browser or Node.js needed
 - Bilingual UI (Simplified Chinese / English): pick a language during install, switch anytime in Settings
@@ -72,7 +73,7 @@ node bin/folio.cjs ch1.md ch2.md -o book.pdf      # merge multiple files
 node bin/folio.cjs -c config.example.json         # use a config file
 ```
 
-Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--leading` (line spacing and heading spacing, default `1em`; try `1.2em` for a looser feel), `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
+Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--leading` (line spacing and heading spacing, default `1em`; try `1.2em` for a looser feel), `--font-cjk` / `--font-latin` / `--font-mono` (body / Latin / monospace font family; any installed family name, a missing one is reported in the log), `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
 
 ## Star History
 
