@@ -1,9 +1,14 @@
 -- Folio 组件（勿删）：pandoc Lua 过滤器 —— 收集 pandoc markdown reader 的缺口修补
--- 由 bin/folio.cjs 经 --lua-filter 调用；只读输入 AST，不写任何文件
--- 当前三项修补：
+-- 由 bin/folio.cjs 经 --lua-filter 调用
+-- 当前六项修补：
 --   ① HTML 断链：reader 不解析 HTML，raw html 被 typst writer 静默丢弃（见下方【断链根因】）
 --   ② 表格单元格内代码 span 的 `\|` 未反转义（见 unescape_pipe_code）
 --   ③ 分隔线被误判成表格：单独一行的 `---` 被 multiline table 抢走（见 unwrap_dash_table）
+--   ④ 空链接目标 / 死锚点：`[文本](#)`、`[文本](#不存在)` 会让 typst 编译失败，降级为纯文本
+--   ⑤ 图片兜底：本地图片复制进转换目录（typst 只认转换目录内的路径），并按文件**内容**嗅探
+--      真实格式、强制正确扩展名——typst 按扩展名选解码器，「.jpg 名配 PNG 内容」这类错名文件
+--      会解码失败整本编译挂；缺失 / 格式不支持 / 远程图片（离线管线不联网抓取）降级为占位文字
+--   ⑥ raw TeX 原样保留为文字：`\LaTeX` 这类 TeX 命令会被 typst writer 静默丢弃（内容丢失）
 --
 -- 【断链根因】
 --   pandoc 的 markdown reader 不解析 HTML：`-f markdown` 遇到 <table> 只吐一串
@@ -15,6 +20,12 @@
 -- 【本过滤器】把连续的 raw html 片段重组成完整 HTML 字符串，交给 html reader 解析成原生 AST 再塞回。
 --   关键：必须按「根标签深度配平」判定结束，用「见到第一个闭合标签就收手」会在 </th> 处截断，
 --         得到不平衡的 HTML 片段，解析结果残缺（实测会把整张表弄丢）。
+--
+-- 【环境变量】（由 bin/folio.cjs 设置，缺省时对应修补自动降级为不动作）
+--   FOLIO_FILTER_REPORT  改动统计报告文件路径
+--   FOLIO_MEDIA_DIR      图片落盘目录（转换运行目录下的 media/，typst 从 body.typ 相对引用）
+--   FOLIO_SRC_DIRS       原始 md 文件所在目录列表（';' 分隔），相对图片路径按此解析
+--   FOLIO_LANG           界面语言 zh/en，占位文字随语言切换
 
 local FORMAT = 'html'
 local BLOCK_TAGS = {
@@ -22,6 +33,23 @@ local BLOCK_TAGS = {
   aside = true, blockquote = true, ul = true, ol = true, dl = true,
   center = true, article = true, nav = true, header = true, footer = true, main = true,
 }
+
+local STATS = {
+  html_blocks = 0, dash_tables = 0,
+  empty_links = 0, dead_links = 0,
+  img_copied = 0, img_missing = 0,
+  raw_tex = 0,
+}
+
+local MEDIA_DIR = os.getenv('FOLIO_MEDIA_DIR')
+local SRC_DIRS = {}
+do
+  local s = os.getenv('FOLIO_SRC_DIRS') or ''
+  for d in s:gmatch('[^;]+') do
+    if d ~= '' then SRC_DIRS[#SRC_DIRS + 1] = d end
+  end
+end
+local LANG = os.getenv('FOLIO_LANG') or 'zh'
 
 local function inlines_to_html(inlines)
   local d = pandoc.Pandoc({ pandoc.Plain(inlines) })
@@ -45,7 +73,7 @@ local function delta(html, tag)
 end
 
 local function fix_blocks(bs)
-  local out, i, hits = {}, 1, 0
+  local out, i = {}, 1
   while i <= #bs do
     local b = bs[i]
     local tag = (b.t == 'RawBlock' and b.format == FORMAT) and root_tag(b.text) or nil
@@ -70,7 +98,7 @@ local function fix_blocks(bs)
       local ok, parsed = pcall(pandoc.read, table.concat(parts, '\n'), FORMAT)
       if ok and closed and #parsed.blocks > 0 then
         for _, nb in ipairs(parsed.blocks) do out[#out + 1] = nb end
-        hits = hits + 1
+        STATS.html_blocks = STATS.html_blocks + 1
         i = j
       else
         out[#out + 1] = b -- 不完整就别动，避免吞掉后文
@@ -81,7 +109,7 @@ local function fix_blocks(bs)
       i = i + 1
     end
   end
-  return out, hits
+  return out
 end
 
 -- 行内：把连续的 raw inline html 重建成原生内联，保住 <b> <br> <sub> 语义
@@ -181,23 +209,216 @@ local function unwrap_dash_table(tbl)
   return out
 end
 
+-- —— ④ 链接兜底：空目标 / 死锚点 ————————————————————————————————
+-- pandoc 的 typst writer 对 `[文本](#)` 产出 `#link()[文本]`（link() 缺参数）、
+-- 对 `[文本](#不存在)` 产出 `#link(<不存在>)[文本]`（label 不存在），两者都让 typst
+-- 硬报错、整本编译失败。这类链接在导出稿（Notion/Typora 模板）里常是装饰性占位。
+-- 修法：目标为空或锚点在本文档里不存在时，退化为纯文本（保留文字，不再假装可点）。
+
+local function percent_decode(s)
+  return (s:gsub('%%(%x%x)', function(h) return string.char(tonumber(h, 16)) end))
+end
+
+-- 文档内的锚点全集（pandoc typst writer 从这些元素的 identifier 生成 <label>）
+local function collect_ids(doc)
+  local ids = {}
+  local function add(el)
+    if el.identifier and el.identifier ~= '' then ids[el.identifier] = true end
+  end
+  doc:walk({
+    Header = add, Div = add, Span = add,
+    Figure = add, CodeBlock = add, Table = add,
+  })
+  return ids
+end
+
+-- —— ⑤⑥ 图片兜底与 raw TeX 保留 ————————————————————————————————
+
+local function str_inlines(s)
+  local out = {}
+  for w in s:gmatch('%S+') do
+    if #out > 0 then out[#out + 1] = pandoc.Space() end
+    out[#out + 1] = pandoc.Str(w)
+  end
+  if #out == 0 then out[1] = pandoc.Str('') end
+  return out
+end
+
+local function file_exists(p)
+  local f = io.open(p, 'rb')
+  if f then f:close() return true end
+  return false
+end
+
+local function read_file(p)
+  local f = io.open(p, 'rb')
+  if not f then return nil end
+  local data = f:read('*a')
+  f:close()
+  return data
+end
+
+local B64CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local B64MAP = {}
+for i = 1, #B64CHARS do B64MAP[B64CHARS:sub(i, i)] = i - 1 end
+
+local function b64decode(s)
+  local out, acc, bits = {}, 0, 0
+  for c in s:gmatch('.') do
+    local v = B64MAP[c]
+    if v then
+      acc = acc * 64 + v
+      bits = bits + 6
+      if bits >= 8 then
+        bits = bits - 8
+        out[#out + 1] = string.char(math.floor(acc / 2 ^ bits) % 256)
+        acc = acc % 2 ^ bits
+      end
+    end
+  end
+  return table.concat(out)
+end
+
+-- 按文件内容嗅探真实图片格式：typst 按扩展名选解码器，落盘文件的扩展名必须与内容一致；
+-- typst 排版不支持的格式返回 nil，调用方降级为占位文字
+local function sniff_ext(data)
+  if not data or #data < 4 then return nil end
+  if data:sub(2, 4) == 'PNG' then return 'png' end
+  if data:sub(1, 3) == '\255\216\255' then return 'jpg' end
+  if data:sub(1, 4) == 'GIF8' then return 'gif' end
+  if data:sub(1, 2) == 'BM' then return 'bmp' end
+  if data:sub(1, 4) == 'RIFF' and data:sub(9, 12) == 'WEBP' then return 'webp' end
+  local head = data:sub(1, 512)
+  if head:find('<svg', 1, true) or (head:find('<%?xml', 1, true) and head:find('svg', 1, true)) then
+    return 'svg'
+  end
+  return nil
+end
+
+local mediaCount = 0
+local function media_name(src, ext)
+  mediaCount = mediaCount + 1
+  local base
+  if src:match('^data:') then
+    base = 'data-image'
+  else
+    base = (src:match('([^/\\]+)$') or 'image'):gsub('[<>:"/\\|?*]', '_')
+    base = base:gsub('%?.*$', ''):gsub('#.*$', ''):gsub('%.[^%.]*$', '')
+    base = base:sub(1, 40)
+  end
+  if base == '' or base == '.' or base == '..' then base = 'image' end
+  return 'img-' .. mediaCount .. '-' .. base .. '.' .. ext
+end
+
+-- 相对路径按原始 md 所在目录解析（转换时 md 被复制进临时目录，cwd 不再是原文目录）
+local function resolve_local(src)
+  if not src or src == '' then return nil end
+  local s = src:gsub('^%./', '')
+  if s:match('^%a:[/\\]') or s:match('^[/\\]') then
+    return file_exists(s) and s or nil
+  end
+  for _, d in ipairs(SRC_DIRS) do
+    local p = d .. '/' .. s
+    if file_exists(p) then return p end
+  end
+  return nil
+end
+
+local function missing_placeholder(img)
+  local alt = ''
+  if img.caption then alt = pandoc.utils.stringify(img.caption) end
+  local src = img.src or ''
+  local text
+  if LANG == 'en' then
+    text = '[image missing: ' .. (alt ~= '' and (alt .. ' -> ') or '') .. src .. ']'
+  else
+    text = '[图片缺失: ' .. (alt ~= '' and (alt .. ' -> ') or '') .. src .. ']'
+  end
+  return pandoc.Emph(str_inlines(text))
+end
+
+local function save_media(img, data, ext)
+  local name = media_name(img.src or 'image', ext)
+  local f = io.open(MEDIA_DIR .. '/' .. name, 'wb')
+  if not f then return nil end
+  f:write(data)
+  f:close()
+  img.src = 'media/' .. name
+  STATS.img_copied = STATS.img_copied + 1
+  return img
+end
+
+local function fix_image(img)
+  if not MEDIA_DIR then return nil end -- 手跑 pandoc 时保持原行为
+  local src = img.src or ''
+  local data
+  if src:match('^data:image/') then
+    local b64 = src:match('^data:image/[%w%+%-%.]+;base64,(.+)$')
+    if b64 then data = b64decode(b64) end
+  elseif src:match('^%a[%w+.-]*://') then
+    data = nil -- 远程图片：离线管线不联网抓取，走占位文字
+  else
+    local p = resolve_local(src)
+    if p then data = read_file(p) end
+  end
+  local ext = sniff_ext(data)
+  if ext then
+    local saved = save_media(img, data, ext)
+    if saved then return saved end
+  end
+  STATS.img_missing = STATS.img_missing + 1
+  return missing_placeholder(img)
+end
+
 function Pandoc(doc)
-  local blocks, hits = fix_blocks(doc.blocks)
-  doc.blocks = blocks
+  doc.blocks = fix_blocks(doc.blocks)
   doc = doc:walk({ Inlines = fix_inlines })
   doc = doc:walk({ Table = unescape_pipe_code })
-  local dash = 0
   doc = doc:walk({
     Table = function(tbl)
       if is_dash_misparse(tbl) then
-        dash = dash + 1
+        STATS.dash_tables = STATS.dash_tables + 1
         return unwrap_dash_table(tbl) -- 返回块列表：pandoc 用这些块替换掉该元素
+      end
+    end,
+  })
+  local ids = collect_ids(doc)
+  doc = doc:walk({
+    Link = function(l)
+      local t = (l.target or ''):gsub('%s+', '')
+      if t == '' or t == '#' then
+        STATS.empty_links = STATS.empty_links + 1
+        return l.content
+      end
+      local frag = t:match('^#(.+)$')
+      if frag and not ids[percent_decode(frag)] then
+        STATS.dead_links = STATS.dead_links + 1
+        return l.content
+      end
+    end,
+    Image = fix_image,
+    RawInline = function(r)
+      if r.format == 'tex' or r.format == 'latex' then
+        STATS.raw_tex = STATS.raw_tex + 1
+        return str_inlines(r.text)
+      end
+    end,
+    RawBlock = function(r)
+      if r.format == 'tex' or r.format == 'latex' then
+        STATS.raw_tex = STATS.raw_tex + 1
+        return pandoc.Para(str_inlines(r.text))
       end
     end,
   })
   -- 统计交给 bin/folio.cjs：优先写报告文件（路径由环境变量给，stdio 被 inherit 时也能拿到），
   -- 再往 stderr 写一行机器可读的版本，便于单独手跑 pandoc 时诊断
-  local line = 'html_blocks=' .. hits .. '\ndash_tables=' .. dash .. '\n'
+  local order = {
+    'html_blocks', 'dash_tables', 'empty_links', 'dead_links',
+    'img_copied', 'img_missing', 'raw_tex',
+  }
+  local buf = {}
+  for _, k in ipairs(order) do buf[#buf + 1] = k .. '=' .. tostring(STATS[k]) end
+  local line = table.concat(buf, '\n') .. '\n'
   local report = os.getenv('FOLIO_FILTER_REPORT')
   if report then
     local f = io.open(report, 'w')

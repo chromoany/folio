@@ -25,7 +25,8 @@ const TMP = process.env.FOLIO_TMP || path.join(os.tmpdir(), 'folio-runs');
 // 输出 #cite(<xxx>) 让 typst 报 "does not contain a bibliography" 整本编译失败。
 // Folio 不生成参考文献（无 --citeproc / --bibliography），关掉纯赚：@提及 会正常转义成 \@xxx。
 const PANDOC_FROM = 'markdown-citations+tex_math_dollars';
-// 修补 HTML 断链的 Lua 过滤器（随 template/ 一起分发，见该文件头部注释）。缺失时自动降级
+// 修补 pandoc 缺口的 Lua 过滤器（HTML 断链 / 空链接与死锚点 / 图片兜底 / raw TeX 保留，
+// 随 template/ 一起分发，见该文件头部注释）。缺失时自动降级
 const HTML_FIX_LUA = path.join(ROOT, 'template', 'pandoc-html-fix.lua');
 
 // 界面语言（zh/en）：GUI 经 cfg.lang 传入，CLI 默认中文；转换日志与错误提示随语言切换
@@ -50,6 +51,11 @@ const MSG = {
     dashTables: (n) => `[folio] 还原 ${n} 处被误判成表格的分隔线（pandoc 把 --- 当表格边框，会竖排成一列）`,
     narrowColumns: (n) => `[folio] 修正 ${n} 处过窄的表格列宽（pandoc 按字符数估算，中文列会偏窄成竖条）`,
     htmlBlocks: (n) => `[folio] 重组 ${n} 处 HTML 块（原生 markdown 不解析 HTML，不重组会被丢弃）`,
+    emptyLinks: (n) => `[folio] ${n} 个链接没有目标（如 [文本](#)），按纯文本排版`,
+    deadLinks: (n) => `[folio] ${n} 个链接指向文档里不存在的锚点，降级为纯文本`,
+    imgCopied: (n) => `[folio] 复制 ${n} 张图片进转换目录（typst 只能读取转换目录内的图片）`,
+    imgMissing: (n) => `[folio] ${n} 张图片未能排版（文件缺失 / 格式不支持 / 远程链接不抓取），已用占位文字替代`,
+    rawTex: (n) => `[folio] ${n} 段 LaTeX 命令按原文字面排版（typst 不支持 TeX）`,
   },
   en: {
     noInput: 'No input files',
@@ -69,6 +75,11 @@ const MSG = {
     dashTables: (n) => `[folio] restored ${n} thematic break(s) mis-parsed as a table (pandoc reads --- as a table border; the column ended up one character wide)`,
     narrowColumns: (n) => `[folio] widened ${n} table(s) with too-narrow columns (pandoc estimates widths by character count, which is off for CJK)`,
     htmlBlocks: (n) => `[folio] rebuilt ${n} HTML block(s) (plain markdown does not parse HTML; they would be dropped)`,
+    emptyLinks: (n) => `[folio] ${n} link(s) have no target (e.g. [text](#)); rendered as plain text`,
+    deadLinks: (n) => `[folio] ${n} link(s) point to anchors that do not exist in the document; rendered as plain text`,
+    imgCopied: (n) => `[folio] copied ${n} image(s) into the run directory (typst can only read images inside it)`,
+    imgMissing: (n) => `[folio] ${n} image(s) not typeset (missing file / unsupported format / remote URL); replaced with a placeholder`,
+    rawTex: (n) => `[folio] ${n} LaTeX snippet(s) rendered as literal text (typst does not support TeX)`,
   },
 };
 
@@ -419,15 +430,35 @@ function build(cfg, { log = () => {} } = {}) {
   }
   log(T('step1'));
   const filterArgs = fs.existsSync(HTML_FIX_LUA) ? ['--lua-filter', HTML_FIX_LUA] : [];
-  // 过滤器（HTML 重组 / 分隔线误判还原）把改动统计写进这个文件，再转成界面语言的日志
+  // 过滤器（HTML 重组 / 分隔线误判还原 / 链接兜底 / 图片兜底 / raw TeX 保留）把改动统计写进
+  // 这个文件，再转成界面语言的日志；图片落进 runDir/media，原始 md 目录用于解析相对图片路径
   const reportFile = path.join(runDir, 'filter-report.txt');
+  const mediaDir = path.join(runDir, 'media');
+  fs.mkdirSync(mediaDir, { recursive: true });
+  const srcDirs = [...new Set(cfg.inputs.map((p) => path.resolve(path.dirname(p))))].join(';');
   const stderr = run(pandocBin, ['-f', PANDOC_FROM, '-t', 'typst', '--wrap=none', ...filterArgs, '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))],
-    ROOT, 'pandoc', { env: { FOLIO_FILTER_REPORT: reportFile } });
+    ROOT, 'pandoc', {
+      env: {
+        FOLIO_FILTER_REPORT: reportFile,
+        FOLIO_MEDIA_DIR: mediaDir,
+        FOLIO_SRC_DIRS: srcDirs,
+        FOLIO_LANG: UI_LANG,
+      },
+    });
   const report = fs.existsSync(reportFile) ? fs.readFileSync(reportFile, 'utf8') : stderr;
-  const m = /html_blocks=(\d+)[\s\S]*?dash_tables=(\d+)/.exec(report);
-  if (m) {
-    if (Number(m[1])) log(T('htmlBlocks', Number(m[1])));
-    if (Number(m[2])) log(T('dashTables', Number(m[2])));
+  // 报告是逐行 key=N；行首/空白锚定，避免 tables= 撞上 dash_tables= 之类子串
+  const grab = (k) => {
+    const mm = new RegExp('(?:^|[\\s])' + k + '=(\\d+)').exec(report);
+    return mm ? Number(mm[1]) : 0;
+  };
+  const reportKeys = [
+    ['htmlBlocks', 'html_blocks'], ['dashTables', 'dash_tables'],
+    ['emptyLinks', 'empty_links'], ['deadLinks', 'dead_links'],
+    ['imgCopied', 'img_copied'], ['imgMissing', 'img_missing'], ['rawTex', 'raw_tex'],
+  ];
+  for (const [key, stat] of reportKeys) {
+    const n = grab(stat);
+    if (n) log(T(key, n));
   }
 
   // pandoc 写出的 typst 列宽可能病态偏窄（中文表格尤甚），编译前兜底一次
