@@ -50,7 +50,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `folio-1.7.10-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。安装包未做代码签名，如首次运行遇到 SmartScreen 提示，点「更多信息 → 仍要运行」即可。
+推荐到 [Releases](../../releases) 下载 `folio-1.7.11-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。安装包未做代码签名，如首次运行遇到 SmartScreen 提示，点「更多信息 → 仍要运行」即可。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

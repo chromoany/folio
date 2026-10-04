@@ -56,6 +56,8 @@ const MSG = {
     imgCopied: (n) => `[folio] 复制 ${n} 张图片进转换目录（typst 只能读取转换目录内的图片）`,
     imgMissing: (n) => `[folio] ${n} 张图片未能排版（文件缺失 / 格式不支持 / 远程链接不抓取），已用占位文字替代`,
     rawTex: (n) => `[folio] ${n} 段 LaTeX 命令按原文字面排版（typst 不支持 TeX）`,
+    fetchedImages: (n) => `[folio] 联网抓取了 ${n} 张远程图片`,
+    fetchFailed: (n, urls) => `[folio] ${n} 张远程图片抓取失败，已用占位文字替代${urls ? '：' + urls : ''}`,
   },
   en: {
     noInput: 'No input files',
@@ -80,6 +82,8 @@ const MSG = {
     imgCopied: (n) => `[folio] copied ${n} image(s) into the run directory (typst can only read images inside it)`,
     imgMissing: (n) => `[folio] ${n} image(s) not typeset (missing file / unsupported format / remote URL); replaced with a placeholder`,
     rawTex: (n) => `[folio] ${n} LaTeX snippet(s) rendered as literal text (typst does not support TeX)`,
+    fetchedImages: (n) => `[folio] fetched ${n} remote image(s)`,
+    fetchFailed: (n, urls) => `[folio] ${n} remote image(s) failed to fetch; replaced with placeholders${urls ? ': ' + urls : ''}`,
   },
 };
 
@@ -98,6 +102,7 @@ const DEFAULTS = {
   chapterBreak: true,
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
   font: { cjk: 'Microsoft YaHei', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
+  images: { fetchRemote: false }, // 远程图片默认不联网抓取（占位文字排版），抓取走 --fetch-remote-images
 };
 
 const HELP = `Folio —— Markdown → 书籍版式 PDF
@@ -112,6 +117,8 @@ const HELP = `Folio —— Markdown → 书籍版式 PDF
   --title / --subtitle     书名 / 副标题
   --toc-depth <N>          目录列到几级标题（默认 3）
   --leading <LEN>          行距与标题上下间距（Typst 长度，默认 1em，如 0.85em / 1.2em）
+  --fetch-remote-images    联网抓取远程图片（默认不抓取，远程图以占位文字排版）
+  --no-fetch-remote-images 不抓取远程图片（覆盖配置文件）
   --no-toc                 不生成目录
   --no-chapter-break       每个 H1 不另起一页
   --pandoc-bin / --typst-bin  指定 pandoc / typst 二进制路径
@@ -291,6 +298,8 @@ function parseArgs(argv) {
     else if (a === '-c' || a === '--config') flags.config = argv[++i];
     else if (a === '--toc-depth') flags.tocDepth = Number(argv[++i]);
     else if (a === '--leading') flags.leading = argv[++i];
+    else if (a === '--fetch-remote-images') flags.fetchRemote = true;
+    else if (a === '--no-fetch-remote-images') flags.fetchRemote = false;
     else if (a === '--no-toc') flags.noToc = true;
     else if (a === '--no-chapter-break') flags.noChapterBreak = true;
     else if (a === '--title') flags.title = argv[++i];
@@ -388,8 +397,70 @@ function run(cmd, args, cwd, label, opts = {}) {
   return String(r.stderr || '').trim();
 }
 
+// —— 远程图片抓取（可选）————————————————————————————————————
+// pandoc 阶段的过滤器只登记 URL 到清单（pandoc 自带 HTTP 栈会硬崩，不能在 Lua 里抓）；
+// 这里逐条抓取、按内容判定真实格式落盘；抓不到就把 image() 调用换成占位文字，保证编译不挂。
+const PLACEHOLDER_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAWSURBVChTY7h58+Z/fJgBXQAdDw8FAMOU4oHd5zcwAAAAAElFTkSuQmCC', 'base64');
+
+// 与过滤器 sniff_ext 同一口径：typst 按扩展名选解码器，落盘扩展名必须与内容一致
+function sniffExt(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
+  const head4 = buf.toString('latin1', 0, 4);
+  if (head4 === 'GIF8') return 'gif';
+  if (head4 === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return 'webp';
+  if (buf.toString('latin1', 0, 2) === 'BM') return 'bmp';
+  const head = buf.toString('utf8', 0, Math.min(buf.length, 512));
+  if (head.includes('<svg') || (head.includes('<?xml') && head.includes('svg'))) return 'svg';
+  return null;
+}
+
+async function fetchRemoteImages(bodyTyp, manifestFile, mediaDir, log) {
+  const lines = fs.existsSync(manifestFile)
+    ? fs.readFileSync(manifestFile, 'utf8').split(/\r?\n/).filter((l) => l.includes('\t'))
+    : [];
+  if (!lines.length) return bodyTyp;
+  let ok = 0;
+  const failed = [];
+  for (const line of lines) {
+    const tab = line.indexOf('\t');
+    const planned = line.slice(0, tab);
+    const url = line.slice(tab + 1);
+    try {
+      const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const len = Number(res.headers.get('content-length') || 0);
+      if (len > 50 * 1024 * 1024) throw new Error('too large');
+      const buf = Buffer.from(await res.arrayBuffer());
+      const ext = sniffExt(buf);
+      if (!ext) throw new Error('not a supported image');
+      const finalName = ext === 'png' ? planned : planned.replace(/\.png$/, '.' + ext);
+      fs.writeFileSync(path.join(mediaDir, finalName), buf);
+      if (finalName !== planned) {
+        bodyTyp = bodyTyp.split('"media/' + planned + '"').join('"media/' + finalName + '"');
+      }
+      ok++;
+    } catch (e) {
+      failed.push({ planned, url });
+    }
+  }
+  for (const f of failed) {
+    // image() 调用整体换成占位文字；万一正则没命中就落一张占位图，编译不能挂
+    const esc = f.planned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('image\\("media/' + esc + '", alt: "(?:[^"\\\\]|\\\\.)*"(?:, [^()]*)?\\)', 'g');
+    const label = '[' + (UI_LANG === 'en' ? 'image missing: ' : '图片缺失: ') + f.url + ']';
+    const next = bodyTyp.replace(re, 'text(fill: gray, ' + strEsc(label) + ')');
+    if (next !== bodyTyp) bodyTyp = next;
+    else fs.writeFileSync(path.join(mediaDir, f.planned), PLACEHOLDER_PNG);
+  }
+  if (ok) log(T('fetchedImages', ok));
+  if (failed.length) log(T('fetchFailed', failed.length, failed.slice(0, 3).map((f) => f.url).join('  ')));
+  return bodyTyp;
+}
+
 /** 执行完整转换。cfg 见 DEFAULTS，可额外带 pandocBin / typstBin。返回 { output, size, runDir } */
-function build(cfg, { log = () => {} } = {}) {
+async function build(cfg, { log = () => {} } = {}) {
   UI_LANG = (cfg && cfg.lang === 'en') ? 'en' : 'zh';
   if (!cfg.inputs || !cfg.inputs.length) throw new Error(T('noInput'));
   if (!cfg.output) cfg.output = cfg.inputs[0].replace(/\.md$/i, '') + '.pdf';
@@ -436,15 +507,18 @@ function build(cfg, { log = () => {} } = {}) {
   const mediaDir = path.join(runDir, 'media');
   fs.mkdirSync(mediaDir, { recursive: true });
   const srcDirs = [...new Set(cfg.inputs.map((p) => path.resolve(path.dirname(p))))].join(';');
+  // 抓取远程图片才建清单：过滤器见 FOLIO_MEDIA_MANIFEST 存在才登记 URL，否则远程图走占位文字
+  const fetchRemote = !!(cfg.images && cfg.images.fetchRemote);
+  const manifestFile = path.join(runDir, 'media-manifest.tsv');
+  const env = {
+    FOLIO_FILTER_REPORT: reportFile,
+    FOLIO_MEDIA_DIR: mediaDir,
+    FOLIO_SRC_DIRS: srcDirs,
+    FOLIO_LANG: UI_LANG,
+  };
+  if (fetchRemote) env.FOLIO_MEDIA_MANIFEST = manifestFile;
   const stderr = run(pandocBin, ['-f', PANDOC_FROM, '-t', 'typst', '--wrap=none', ...filterArgs, '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))],
-    ROOT, 'pandoc', {
-      env: {
-        FOLIO_FILTER_REPORT: reportFile,
-        FOLIO_MEDIA_DIR: mediaDir,
-        FOLIO_SRC_DIRS: srcDirs,
-        FOLIO_LANG: UI_LANG,
-      },
-    });
+    ROOT, 'pandoc', { env });
   const report = fs.existsSync(reportFile) ? fs.readFileSync(reportFile, 'utf8') : stderr;
   // 报告是逐行 key=N；行首/空白锚定，避免 tables= 撞上 dash_tables= 之类子串
   const grab = (k) => {
@@ -461,8 +535,11 @@ function build(cfg, { log = () => {} } = {}) {
     if (n) log(T(key, n));
   }
 
+  // 远程图片（勾选抓取时）：Node 侧抓取、按内容正名；抓不到降级占位文字
+  let bodyTyp = fs.readFileSync(bodyFile, 'utf8');
+  if (fetchRemote) bodyTyp = await fetchRemoteImages(bodyTyp, manifestFile, mediaDir, log);
   // pandoc 写出的 typst 列宽可能病态偏窄（中文表格尤甚），编译前兜底一次
-  fs.writeFileSync(bodyFile, fixNarrowColumns(fs.readFileSync(bodyFile, 'utf8'), (m2) => log(m2)), 'utf8');
+  fs.writeFileSync(bodyFile, fixNarrowColumns(bodyTyp, (m2) => log(m2)), 'utf8');
 
   log(T('step2'));
   fs.writeFileSync(mainFile, renderTemplate(cfg), 'utf8');
@@ -475,7 +552,7 @@ function build(cfg, { log = () => {} } = {}) {
   return { output: outAbs, size, runDir };
 }
 
-function main() {
+async function main() {
   const { flags, inputs } = parseArgs(process.argv.slice(2));
   if (flags.help) {
     process.stdout.write(HELP);
@@ -491,6 +568,7 @@ function main() {
   if (flags.output) cfg.output = flags.output;
   if (flags.tocDepth) cfg.toc.depth = flags.tocDepth;
   if (flags.leading) cfg.font.leading = flags.leading;
+  if (flags.fetchRemote !== undefined) cfg.images.fetchRemote = flags.fetchRemote;
   if (flags.noToc) cfg.toc.enabled = false;
   if (flags.noChapterBreak) cfg.chapterBreak = false;
   if (flags.title) cfg.title = flags.title;
@@ -498,16 +576,16 @@ function main() {
   cfg.pandocBin = flags.pandocBin;
   cfg.typstBin = flags.typstBin;
 
-  build(cfg, { log: (m) => console.log(m) });
+  await build(cfg, { log: (m) => console.log(m) });
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (e) {
-    console.error('出错：', e.message || e);
-    process.exit(1);
-  }
+  Promise.resolve()
+    .then(() => main())
+    .catch((e) => {
+      console.error('出错：', e.message || e);
+      process.exit(1);
+    });
 }
 
 module.exports = { build, renderTemplate, deepMerge, DEFAULTS };

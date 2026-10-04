@@ -217,10 +217,11 @@ async function handle(req, res) {
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
         page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
         font: { ...fresh.DEFAULTS.font, ...(leading ? { leading } : {}) }, // 字号/行距默认值单一来源，别在这里再写一份
+        images: { fetchRemote: b.fetchRemote === true }, // 远程图片联网抓取（默认关，占位文字排版）
         lang: settings.get('language'), // 转换日志/错误提示随界面语言
       };
       const logs = [];
-      const r = fresh.build(cfg, { log: (m) => logs.push(m) });
+      const r = await fresh.build(cfg, { log: (m) => logs.push(m) });
       trackOpenable(r.output);
       trackOpenable(path.dirname(r.output));
       jobs.set(id, { pdf: r.output, name: path.basename(r.output), dir: path.dirname(r.output) });

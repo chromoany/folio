@@ -186,7 +186,9 @@
         <div class="checks">
           <label><input type="checkbox" id="toc" checked> <span data-i18n="chkToc">生成目录</span></label>
           <label><input type="checkbox" id="chapterBreak" checked> <span data-i18n="chkBreak">每章（H1）另起一页</span></label>
+          <label><input type="checkbox" id="fetchRemote"> <span data-i18n="chkFetchRemote">联网抓取远程图片</span></label>
         </div>
+        <div class="hint" data-i18n="fetchRemoteHint">默认不抓取：远程图片以占位文字排版，转换完全离线、不受网络影响。</div>
       </div>
     </div>
   </div>
@@ -270,6 +272,8 @@
       phOutput: '如 D:\\...\\书.pdf',
       chkToc: '生成目录',
       chkBreak: '每章（H1）另起一页',
+      chkFetchRemote: '联网抓取远程图片',
+      fetchRemoteHint: '默认不抓取：远程图片以占位文字排版，转换完全离线、不受网络影响。',
       step3Card: '③ 转换',
       goBtn: '开始转换',
       lblTheme: '外观主题',
@@ -329,6 +333,8 @@
       phOutput: 'e.g. D:\\...\\book.pdf',
       chkToc: 'Table of contents',
       chkBreak: 'Each chapter (H1) starts a new page',
+      chkFetchRemote: 'Fetch remote images online',
+      fetchRemoteHint: 'Off by default: remote images are typeset as placeholder text, so conversion stays fully offline.',
       step3Card: '③ Convert',
       goBtn: 'Convert',
       lblTheme: 'Theme',
@@ -468,6 +474,7 @@
         leading: document.getElementById('leading').value,
         toc: document.getElementById('toc').checked,
         chapterBreak: document.getElementById('chapterBreak').checked,
+        fetchRemote: document.getElementById('fetchRemote').checked,
         output: document.getElementById('output').value.trim() || null,
       };
       logEl.textContent = t('uploading');

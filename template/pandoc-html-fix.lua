@@ -7,7 +7,9 @@
 --   ④ 空链接目标 / 死锚点：`[文本](#)`、`[文本](#不存在)` 会让 typst 编译失败，降级为纯文本
 --   ⑤ 图片兜底：本地图片复制进转换目录（typst 只认转换目录内的路径），并按文件**内容**嗅探
 --      真实格式、强制正确扩展名——typst 按扩展名选解码器，「.jpg 名配 PNG 内容」这类错名文件
---      会解码失败整本编译挂；缺失 / 格式不支持 / 远程图片（离线管线不联网抓取）降级为占位文字
+--      会解码失败整本编译挂；缺失 / 格式不支持 / 远程图片（离线管线不联网抓取）降级为占位文字。
+--      远程图片若 FOLIO_MEDIA_MANIFEST 存在（用户开了联网抓取）则只登记 URL 到清单、留好文件名，
+--      抓取与失败兜底都由 bin/folio.cjs 在 Node 侧做（pandoc 自带 HTTP 栈会硬崩，勿在 Lua 里抓）
 --   ⑥ raw TeX 原样保留为文字：`\LaTeX` 这类 TeX 命令会被 typst writer 静默丢弃（内容丢失）
 --
 -- 【断链根因】
@@ -42,6 +44,7 @@ local STATS = {
 }
 
 local MEDIA_DIR = os.getenv('FOLIO_MEDIA_DIR')
+local MANIFEST = os.getenv('FOLIO_MEDIA_MANIFEST') -- 远程图片抓取清单；不设 = 不抓取，走占位文字
 local SRC_DIRS = {}
 do
   local s = os.getenv('FOLIO_SRC_DIRS') or ''
@@ -348,6 +351,7 @@ local function save_media(img, data, ext)
   return img
 end
 
+local remoteCount = 0
 local function fix_image(img)
   if not MEDIA_DIR then return nil end -- 手跑 pandoc 时保持原行为
   local src = img.src or ''
@@ -356,7 +360,19 @@ local function fix_image(img)
     local b64 = src:match('^data:image/[%w%+%-%.]+;base64,(.+)$')
     if b64 then data = b64decode(b64) end
   elseif src:match('^%a[%w+.-]*://') then
-    data = nil -- 远程图片：离线管线不联网抓取，走占位文字
+    if MANIFEST then
+      -- 抓取交给 Node 侧：登记 URL、先占一个文件名；抓到什么格式由 folio.cjs 按内容正名
+      remoteCount = remoteCount + 1
+      local name = 'remote-' .. remoteCount .. '.png'
+      local f = io.open(MANIFEST, 'a')
+      if f then
+        f:write(name .. '\t' .. src .. '\n')
+        f:close()
+      end
+      img.src = 'media/' .. name
+      return img
+    end
+    data = nil -- 未开抓取：远程图片走占位文字
   else
     local p = resolve_local(src)
     if p then data = read_file(p) end
