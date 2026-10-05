@@ -67,6 +67,10 @@ const MSG = {
     badMermaidCurve: (v) => `未知的 mermaid 连线曲线：${v}（可选：${MERMAID_CURVES.join(' / ')}）`,
     fontMissing: (v) => `[folio] 字体未安装，排版会回退到替代字体：${v}`,
     badFont: (v) => `字体名不合法：${v}（不能含引号、反斜杠或换行）`,
+    badStyle: (v) => `未知的版式方案：${v}（可选：${STYLE_CHOICES.join(' / ')}）`,
+    styleApplied: (v) => `[folio] 版式方案：${v}`,
+    sizePreset: (v) => `[folio] 字号方案：${v}`,
+    badSizePreset: (v) => `未知的字号方案：${v}（可选：${Object.keys(SIZE_PRESETS).join(' / ')} / default）`,
   },
   en: {
     noInput: 'No input files',
@@ -102,6 +106,10 @@ const MSG = {
     badMermaidCurve: (v) => `Unknown mermaid line curve: ${v} (allowed: ${MERMAID_CURVES.join(' / ')})`,
     fontMissing: (v) => `[folio] font not installed — typesetting falls back to a substitute: ${v}`,
     badFont: (v) => `Invalid font family: ${v} (quotes, backslashes and newlines are not allowed)`,
+    badStyle: (v) => `Unknown layout preset: ${v} (allowed: ${STYLE_CHOICES.join(' / ')})`,
+    styleApplied: (v) => `[folio] layout preset: ${v}`,
+    sizePreset: (v) => `[folio] font size preset: ${v}`,
+    badSizePreset: (v) => `Unknown font size preset: ${v} (allowed: ${Object.keys(SIZE_PRESETS).join(' / ')} / default)`,
   },
 };
 
@@ -119,24 +127,110 @@ const DEFAULTS = {
   toc: { enabled: true, title: '目录', depth: 3 },
   chapterBreak: true,
   page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-  font: { cjk: 'Microsoft YaHei', latin: '', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em' },
+  // 界面上有「简单 / 详细」两档（见 HELP）：简单只让你挑下面两套方案，详细逐项调这里的每个字段。
+  // 两套方案都只是**基线默认值**（见 baseConfig），显式写进来的字段永远压过它们 —— GUI 的详细
+  // 模式、命令行的单项参数、配置文件都是「显式字段」，所以方案是预设、不是开关。
+  // style = 版式方案（见 STYLE_PRESETS）：default = 原有版式（一个字节都不变）；ctexart = 对齐 LaTeX ctexart。
+  style: 'default',
+  // font.preset = 字号方案（见 SIZE_PRESETS）：default = 不覆盖，直接用这里的字号。
+  // h1–h4 是标题字号（pt），早先写死在 book.typ.tpl 里，现改由这里注入（默认值与旧模板逐字一致）。
+  font: { preset: 'default', cjk: 'Microsoft YaHei', latin: '', mono: 'Consolas', monoCjk: 'NSimSun', size: '10.5pt', monoSize: '8pt', leading: '1em', h1: 16, h2: 14, h3: 12, h4: 11 },
+  // heading = 标题样式开关（默认即原有版式）：center 一级标题与目录标题居中；rule 标题下划线；
+  // cjkStyles 中文粗体走黑体、中文斜体走楷体（否则用中文印刷体自带粗体）。
+  heading: { center: false, rule: true, cjkStyles: false },
   images: { fetchRemote: false }, // 远程图片默认不联网抓取（占位文字排版），抓取走 --fetch-remote-images
   mermaid: { theme: 'neutral', curve: 'basis' }, // mermaid 图的主题/连线曲线（口味型配置，界面可选；默认值单一来源，别在别处再写一份）
   sourceDirs: [], // 相对图片的解析根：GUI 只传内容时带 md 原始目录；空 = 用 inputs 所在目录（CLI）
 };
 
+// 纸张（typst 的 paper 名；界面下拉给常用几档，配置里可写任意 typst 纸型名）
+const PAPERS = ['a4', 'a5', 'b5', 'us-letter'];
+
 // mermaid 主题与连线曲线的合法取值（mermaid 自身的取值集合；界面下拉给常用子集）
 const MERMAID_THEMES = ['default', 'base', 'neutral', 'forest', 'dark', 'null'];
 const MERMAID_CURVES = ['basis', 'linear', 'step', 'stepAfter', 'stepBefore', 'cardinal', 'catmullRom', 'monotoneX', 'monotoneY', 'natural', 'bumpX', 'bumpY'];
 
-// 字体三档（按字族用途分类，口径与 LaTeX 一致）：cjk = 中文字族（≈ CJKmainfont），
-// latin = 西文字族（≈ mainfont，只管字母数字），mono = 代码等宽字族（≈ ttfamily）。
+// 字号方案（一套 = 正文 + 代码块 + 各级标题字号）。名字取自 ctexart 的中文字号体系：
+//   small  = 小五 9pt（紧凑小册子；ctex 无此基准档，按 normal 比例外推）
+//   normal = 五号 10.5pt（ctexart 默认 zihao=5）：标题按 LaTeX 层级（H1 小三 15 / H2 小四 12 / H3 H4 五号）
+//   large  = 小四 12pt（ctexart zihao=-4，中文论文常用）：H1 小二 18 / H2 小三 15 / H3 H4 小四
+// 三档是一把「整体缩放」的尺子：正文与代码块一起变大变小，代码块始终比正文小一档（与 Folio 默认
+// 的 10.5pt / 8pt 同比例），不会出现「选了小五、代码块反而变大」这种反直觉的结果。
+// 行距不随方案变（leading 是相对字号的 em，三档等效）。
+// 'default' 与任何未知值都表示「不覆盖」——直接用配置里的 size/monoSize/h1–h4（默认即原有字号）。
+const SIZE_PRESETS = {
+  small: { size: '9pt', monoSize: '7pt', h1: 13, h2: 10.5, h3: 9, h4: 9 },
+  normal: { size: '10.5pt', monoSize: '8pt', h1: 15, h2: 12, h3: 10.5, h4: 10.5 },
+  large: { size: '12pt', monoSize: '9pt', h1: 18, h2: 15, h3: 12, h4: 12 },
+};
+
+// 版式方案（口味型预设，界面/命令行可选）。默认 default = 原有版式。
+// 方案只提供**基线默认值**：字体/行距/字号/标题样式铺进 baseConfig()，用户显式写的
+// font.* / heading.* / page.* 永远优先 —— 所以方案是「一套默认值」，不是不可拆的开关。
+const STYLE_CHOICES = ['default', 'ctexart'];
+const STYLE_PRESETS = {
+  ctexart: {
+    label: 'ctexart',
+    // ctexart windows fontset 的字族口径：宋体正文、黑体粗体与标题、楷体斜体、仿宋等宽中文；
+    // 西文用 typst 自带的 New Computer Modern（LaTeX 默认观感，必定装得上）与 DejaVu Sans Mono
+    // —— 不写 Latin Modern Roman/Mono：那要装了 TeX Live 才有，多数机器上会静默回退。
+    font: { cjk: 'SimSun', latin: 'New Computer Modern', mono: 'DejaVu Sans Mono', monoCjk: 'FangSong' },
+    leading: '0.8em', // 中文行距比西文松一档（ctexart 的 \linespread）
+    // 字号走五号体系（正文 10.5pt，标题 15/12/10.5/10.5）。想配别的字号，显式给 --preset /
+    // font.preset 就能压过它（基线只提供默认值）。
+    preset: 'normal',
+    heading: { center: true, rule: false, cjkStyles: true }, // 一级标题居中、不画下划线、中文粗斜体走黑体楷体
+    // 表格不动：typst 的 figure 自带居中（实测 align(center)[…] 去不去掉都一样），要真左对齐只能放弃
+    // figure 外壳、连题注一起丢 —— 收益不值，且改动依赖 pandoc 的输出形状。列内的对齐标记始终有效。
+  },
+};
+
+/** 基线配置：把两个方案（版式方案 + 字号方案）的默认值铺进 DEFAULTS 的副本。
+ *  用户配置在这之后再 merge，所以「方案给基线、显式字段给覆盖」的优先级天然成立 ——
+ *  两个方案都是**一套默认值**（不是不可拆的开关）：显式写的 font.* / heading.* / page.* 永远压过它们。
+ *  这也是界面「详细」模式能逐项改的前提：改的是字段，方案只在切换时把字段填一遍。 */
+function baseConfig(style, preset) {
+  const cfg = JSON.parse(JSON.stringify(DEFAULTS));
+  const p = STYLE_PRESETS[style];
+  if (p) {
+    cfg.style = style;
+    Object.assign(cfg.font, p.font);
+    if (p.heading) Object.assign(cfg.heading, p.heading);
+    if (p.leading) cfg.font.leading = p.leading;
+  }
+  // 字号方案：显式给的 preset 优先，其次是版式方案自带的口径（ctexart = 五号），最后是默认（不覆盖任何字号）
+  const pn = preset || (p && p.preset) || DEFAULTS.font.preset;
+  if (SIZE_PRESETS[pn]) Object.assign(cfg.font, SIZE_PRESETS[pn]);
+  cfg.font.preset = pn;
+  return cfg;
+}
+
+/** 组装最终配置：方案基线 + 用户配置（raw 里的 style / font.preset 也认）。CLI / GUI 都走这里，别各写各的。 */
+function resolveConfig(raw = {}, styleFlag) {
+  const style = styleFlag || raw.style || DEFAULTS.style;
+  const cfg = deepMerge(baseConfig(style, raw.font && raw.font.preset), raw);
+  cfg.style = style; // 未知方案也原样透传给 build() 报错，不在这里静默当成默认版式
+  return cfg;
+}
+
+/** 当前版式方案的派生项（default/未知 → null，表示走原有版式） */
+function styleOf(cfg) {
+  return (cfg && STYLE_PRESETS[cfg.style]) || null;
+}
+
+// 字体四档（按字族用途分类，口径与 LaTeX 一致）：cjk = 中文字族（≈ CJKmainfont），
+// latin = 西文字族（≈ mainfont，只管字母数字），mono = 代码等宽字族（≈ ttfamily），
+// monoCjk = 代码块里的汉字（等宽族不含汉字，得单独给一档，否则会落到正文的宋体/雅黑）。
 // 下面只是界面下拉的「常用」清单（单一来源：GUI 经 /api/fonts 取，别在 html 里再抄一份）；
 // 已装字体由 /api/fonts 动态补全，CLI / 配置文件可写任意字族名（写错会在日志里报未安装并回退）。
 const FONT_CHOICES = {
   cjk: ['Microsoft YaHei', 'SimSun', 'SimHei', 'KaiTi', 'FangSong', 'DengXian', 'NSimSun', 'Noto Serif SC', 'Noto Sans SC', 'Source Han Serif SC', 'Source Han Sans SC', 'STSong', 'STKaiti', 'YouYuan'],
-  latin: ['Times New Roman', 'Cambria', 'Georgia', 'Garamond', 'Palatino Linotype', 'Book Antiqua', 'Arial', 'Segoe UI', 'Calibri', 'Verdana', 'Tahoma'],
-  mono: ['Consolas', 'Cascadia Code', 'Cascadia Mono', 'JetBrains Mono', 'Courier New', 'Lucida Console', 'NSimSun', 'Fira Code', 'Source Code Pro'],
+  // New Computer Modern 是 typst 自带的西文衬线（LaTeX 默认观感，任何机器都不用装字体），列在清单里便于手选
+  latin: ['Times New Roman', 'New Computer Modern', 'Cambria', 'Georgia', 'Garamond', 'Palatino Linotype', 'Book Antiqua', 'Arial', 'Segoe UI', 'Calibri', 'Verdana', 'Tahoma'],
+  // DejaVu Sans Mono 同样是 typst 自带的等宽字体（无 TeX 环境的稳妥选择）
+  mono: ['Consolas', 'DejaVu Sans Mono', 'Cascadia Code', 'Cascadia Mono', 'JetBrains Mono', 'Courier New', 'Lucida Console', 'NSimSun', 'Fira Code', 'Source Code Pro'],
+  // 代码块里的汉字（等宽族）：NSimSun / FangSong 是 Windows 上最接近「等宽」的两款中文字族
+  monoCjk: ['NSimSun', 'FangSong', 'SimSun', 'SimHei', 'Microsoft YaHei', 'KaiTi', 'Noto Sans Mono CJK SC'],
 };
 
 // 已装字族清单（`typst fonts`）按二进制路径缓存：一进程只查一次。
@@ -168,20 +262,35 @@ const HELP = `Folio —— Markdown → 书籍版式 PDF
   node folio.cjs <input.md...> -o <out.pdf> [选项]
   node folio.cjs -c config.json
 
+两种用法（对应界面的「简单 / 详细」两档）：
+  简单  只挑两套方案，其余全用默认值：
+        node folio.cjs 书.md -o 书.pdf --style ctexart --preset normal
+  详细  逐项给参数（或写配置文件），可覆盖方案里的任何一项：
+        node folio.cjs 书.md -o 书.pdf --style ctexart --leading 1.2em --font-mono Consolas
+
 选项：
   -o, --output <file>      输出 PDF（默认：第一个输入同名 .pdf）
   -c, --config <file>      配置文件（JSON）
   --title / --subtitle     书名 / 副标题
+  --style <NAME>           版式方案：default（默认，原有版式）/ ctexart（对齐 LaTeX ctexart：宋体正文、
+                           黑体粗体、楷体斜体、西文 New Computer Modern、标题居中无下划线）
+  --preset <NAME>          字号方案：default（默认，原有字号）/ small（小五）/ normal（五号）/ large（小四）
+                           一套含正文 + 代码块 + 各级标题字号
   --toc-depth <N>          目录列到几级标题（默认 3）
-  --leading <LEN>          行距与标题上下间距（Typst 长度，默认 1em，如 0.85em / 1.2em）
-  --font-cjk <字族>        正文字体（中文），默认 Microsoft YaHei，如 SimSun / KaiTi / Noto Serif SC
-  --font-latin <字族>      西文字体（字母数字），默认跟随中文字体，如 Times New Roman
-  --font-mono <字族>       代码等宽字体，默认 Consolas，如 Cascadia Code / JetBrains Mono
+  --leading <LEN>          行距与标题上下间距（Typst 长度，默认 1em，如 0.85em / 1.2em；ctexart 给 0.8em）
+  --font-cjk <字族>        正文字体（中文），默认 Microsoft YaHei（ctexart 给 SimSun）
+  --font-latin <字族>      西文字体（字母数字），默认跟随中文字体，如 Times New Roman / New Computer Modern
+  --font-mono <字族>       代码等宽字体，默认 Consolas，如 DejaVu Sans Mono / Cascadia Code
+  --font-mono-cjk <字族>   代码块里的汉字（等宽族不含汉字），默认 NSimSun，如 FangSong
   --fetch-remote-images    联网抓取远程图片（默认不抓取，远程图以占位文字排版）
   --no-fetch-remote-images 不抓取远程图片（覆盖配置文件）
   --no-toc                 不生成目录
   --no-chapter-break       每个 H1 不另起一页
   --pandoc-bin / --typst-bin  指定 pandoc / typst 二进制路径
+
+两套方案都只是「一套基线默认值」：配置文件里显式写的 font.* / heading.* / page.* 字段永远优先
+（--preset small 也一样只填基线）。纸张 / 页边距 / 标题样式 / 各级标题字号 / 中文粗斜体口径
+都在配置文件的 page.* / heading.* / font.h1–h4 里（见 config.example.json）；界面「详细」模式可逐项调。
 `;
 
 function deepMerge(base, extra) {
@@ -357,10 +466,13 @@ function parseArgs(argv) {
     if (a === '-o' || a === '--output') flags.output = argv[++i];
     else if (a === '-c' || a === '--config') flags.config = argv[++i];
     else if (a === '--toc-depth') flags.tocDepth = Number(argv[++i]);
+    else if (a === '--style') flags.style = argv[++i];
+    else if (a === '--preset') flags.preset = argv[++i];
     else if (a === '--leading') flags.leading = argv[++i];
     else if (a === '--font-cjk') flags.fontCjk = argv[++i];
     else if (a === '--font-latin') flags.fontLatin = argv[++i];
     else if (a === '--font-mono') flags.fontMono = argv[++i];
+    else if (a === '--font-mono-cjk') flags.fontMonoCjk = argv[++i];
     else if (a === '--fetch-remote-images') flags.fetchRemote = true;
     else if (a === '--no-fetch-remote-images') flags.fetchRemote = false;
     else if (a === '--no-toc') flags.noToc = true;
@@ -401,14 +513,31 @@ function renderTemplate(cfg) {
   const p = cfg.page;
   const f = cfg.font;
   const toc = cfg.toc;
+  const h = cfg.heading; // 标题样式开关（默认版式：左对齐 + 下划线；ctexart 方案给居中 + 无下划线）
 
+  // 标题下划线
+  const rule = h.rule === false ? '' : ', inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333"))';
+  // 一级标题与目录标题的水平位置：Typst 的 block 没有 align 参数（写进去会报 unexpected argument），
+  // 只能用内容级函数 align(center) 从外侧把整个标题块摆到版心水平居中；间距仍由内层 block 负责。
+  const centered = !!h.center;
+  const h1Block = `#block(above: 0em, below: 1.5 * {{LEADING}}${rule})[#it]`;
+  const h1Inline = `block(above: 2.0 * {{LEADING}}, below: 1.5 * {{LEADING}}${rule}, it)`;
   // H1 的块间距同样随 font.leading 联动（{{LEADING}} 在 renderTemplate 末尾统一替换）
   const h1Show = cfg.chapterBreak
-    ? `#show heading.where(level: 1): it => [
+    ? centered
+      ? `#show heading.where(level: 1): it => [
   #pagebreak()
-  #block(above: 0em, below: 1.5 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#it]
+  #align(center)[
+    ${h1Block}
+  ]
 ]`
-    : `#show heading.where(level: 1): it => block(above: 2.0 * {{LEADING}}, below: 1.5 * {{LEADING}}, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")), it)`;
+      : `#show heading.where(level: 1): it => [
+  #pagebreak()
+  ${h1Block}
+]`
+    : centered
+      ? `#show heading.where(level: 1): it => align(center)[\n  ${h1Inline}\n]`
+      : `#show heading.where(level: 1): it => ${h1Inline}`;
 
   let titleBlock = '';
   if (cfg.title) {
@@ -417,15 +546,36 @@ function renderTemplate(cfg) {
     titleBlock += `#line(length: 100%, stroke: 0.6pt + rgb("#999999"))\n#v(0.8em)`;
   }
 
-  const tocBlock = toc.enabled
-    ? `#block(above: 0.6em, below: 0.5em, inset: (bottom: 0.3em), stroke: (bottom: 0.6pt + rgb("#333333")))[#text(size: 16pt, weight: "bold")[${contEsc(toc.title)}]]\n#outline(title: none, indent: auto, depth: ${toc.depth})`
-    : '';
+  const tocTitle = centered
+    ? `#align(center)[#block(above: 0.6em, below: 0.5em)[#text(size: 15pt, weight: "bold")[${contEsc(toc.title)}]]]`
+    : `#block(above: 0.6em, below: 0.5em${rule})[#text(size: 16pt, weight: "bold")[${contEsc(toc.title)}]]`;
+  const tocBlock = toc.enabled ? `${tocTitle}\n#outline(title: none, indent: auto, depth: ${toc.depth})` : '';
 
   // 字体链：西文字族（可选）→ 中文字族 → SimSun 兜底。Typst 按字形逐个回退：字母数字走第一个
   // 装得上的字族，汉字落到中文字族。latin 留空（默认）时链与旧版完全一致 —— 输出逐字节不变。
   const fontStack = [];
   if (f.latin && f.latin !== f.cjk) fontStack.push('"' + strEsc(f.latin) + '"');
   fontStack.push('"' + strEsc(f.cjk) + '"', '"SimSun"');
+
+  // 标题字号（h1–h4）由配置注入；早先写死在模板里，现与字号方案联动（默认值与旧模板逐字一致）。
+  // 模板里这段自带 pt 后缀，所以这里统一归一成「数字 + pt」——配置写 16 或 "16pt" 都认。
+  // ctexart 方案的标题走黑体链（ctexart 惯例：中文粗体 = 黑体 SimHei；未安装时 Typst 自动落到下一个字族）。
+  const ptSize = (v) => String(v).replace(/\s*pt$/i, '') + 'pt';
+  const boldFont = [f.latin && f.latin !== f.cjk ? '"' + strEsc(f.latin) + '"' : null, '"SimHei"', '"' + strEsc(f.cjk) + '"', '"SimSun"'].filter(Boolean).join(', ');
+  // cjkStyles 开启时标题整体走黑体链（ctexart 惯例：标题 = 黑体）；关闭则标题沿用正文字族自带粗体。
+  const headingFont = h.cjkStyles ? `, font: (${boldFont})` : '';
+  const headingSizes = [1, 2, 3, 4]
+    .map((i) => `#show heading.where(level: ${i}): set text(size: ${ptSize(f['h' + i])}${headingFont})`)
+    .join('\n');
+
+  // 中文粗体走黑体、中文斜体走楷体（ctexart windows fontset：SimSun 的 BoldFont=SimHei、ItalicFont=KaiTi）。
+  // 只在 ctexart 方案下注入：默认版式维持「用中文印刷体的自带粗体」，输出逐字节不变。
+  // 字族未安装时 Typst 自动落到下一个字族（伪粗/伪斜），不报错。
+  const boldItalicShow = h.cjkStyles
+    ? `// 中文粗体走黑体、中文斜体走楷体，西文粗斜体仍走西文衬线（heading.cjkStyles）\n` +
+      `#show strong: set text(font: (${boldFont}))\n` +
+      `#show emph: set text(font: (${['"' + strEsc(f.latin || f.cjk) + '"', '"KaiTi"', '"SimSun"'].filter(Boolean).join(', ')}))\n`
+    : '';
 
   return tpl
     .replaceAll('{{DOC_TITLE}}', strEsc(cfg.title))
@@ -438,6 +588,8 @@ function renderTemplate(cfg) {
     .replaceAll('{{PAPER}}', p.paper)
     .replaceAll('{{MARGIN_X}}', p.marginX)
     .replaceAll('{{MARGIN_Y}}', p.marginY)
+    .replaceAll('{{HEADING_SIZES}}', headingSizes)
+    .replaceAll('{{BOLD_ITALIC_SHOW}}', boldItalicShow)
     .replaceAll('{{H1_SHOW}}', h1Show)
     .replaceAll('{{TITLE_BLOCK}}', titleBlock)
     .replaceAll('{{TOC_BLOCK}}', tocBlock)
@@ -588,6 +740,12 @@ async function build(cfg, { log = () => {} } = {}) {
   UI_LANG = (cfg && cfg.lang === 'en') ? 'en' : 'zh';
   if (!cfg.inputs || !cfg.inputs.length) throw new Error(T('noInput'));
   if (!cfg.output) cfg.output = cfg.inputs[0].replace(/\.md$/i, '') + '.pdf';
+  // 版式方案 / 字号方案：未知值直接拒绝（免得「选了没生效」），合法值在这里展开
+  if (cfg.style && cfg.style !== DEFAULTS.style && !STYLE_PRESETS[cfg.style]) throw new Error(T('badStyle', cfg.style));
+  if (cfg.font && cfg.font.preset && cfg.font.preset !== 'default' && !SIZE_PRESETS[cfg.font.preset]) {
+    throw new Error(T('badSizePreset', cfg.font.preset));
+  }
+  const st = styleOf(cfg);
   // mermaid 主题/连线曲线：缺省补默认值，乱值直接拒绝（避免拼进渲染配置）
   cfg.mermaid = deepMerge(DEFAULTS.mermaid, cfg.mermaid || {});
   if (!MERMAID_THEMES.includes(cfg.mermaid.theme)) throw new Error(T('badMermaidTheme', cfg.mermaid.theme));
@@ -639,6 +797,9 @@ async function build(cfg, { log = () => {} } = {}) {
   }
 
   log(T('nFiles', cfg.inputs.length, outAbs));
+  // 版式方案/字号方案是口味型开关：生效时必须能在日志里看到（不然「选了没生效」无从判断）
+  if (st) log(T('styleApplied', cfg.style));
+  if (SIZE_PRESETS[cfg.font.preset]) log(T('sizePreset', cfg.font.preset));
   if (missingFonts.length) log(T('fontMissing', missingFonts.join(' / ')));
   if (stats.toc) log(T('skipToc', stats.toc));
   if (mermaid.rendered) log(T('mermaidRendered', mermaid.rendered));
@@ -716,11 +877,12 @@ async function main() {
     return;
   }
 
-  let cfg = JSON.parse(JSON.stringify(DEFAULTS));
-  if (flags.config) {
-    const raw = JSON.parse(fs.readFileSync(flags.config, 'utf8'));
-    cfg = deepMerge(cfg, raw);
-  }
+  // 方案类参数（--style / --preset）属于「基线」，必须在 resolveConfig 之前并入 raw；
+  // 配置文件里的字段与其余命令行参数都是「显式值」，合并顺序在后，永远压过方案基线。
+  let raw = {};
+  if (flags.config) raw = JSON.parse(fs.readFileSync(flags.config, 'utf8'));
+  if (flags.preset) raw.font = { ...(raw.font || {}), preset: flags.preset };
+  const cfg = resolveConfig(raw, flags.style);
   if (inputs.length) cfg.inputs = inputs;
   if (flags.output) cfg.output = flags.output;
   if (flags.tocDepth) cfg.toc.depth = flags.tocDepth;
@@ -728,6 +890,7 @@ async function main() {
   if (flags.fontCjk) cfg.font.cjk = flags.fontCjk;
   if (flags.fontLatin !== undefined) cfg.font.latin = flags.fontLatin;
   if (flags.fontMono) cfg.font.mono = flags.fontMono;
+  if (flags.fontMonoCjk) cfg.font.monoCjk = flags.fontMonoCjk;
   if (flags.fetchRemote !== undefined) cfg.images.fetchRemote = flags.fetchRemote;
   if (flags.noToc) cfg.toc.enabled = false;
   if (flags.noChapterBreak) cfg.chapterBreak = false;
@@ -748,4 +911,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { build, renderTemplate, deepMerge, DEFAULTS, MERMAID_THEMES, MERMAID_CURVES, FONT_CHOICES, listFonts };
+module.exports = { build, renderTemplate, deepMerge, resolveConfig, styleOf, DEFAULTS, PAPERS, STYLE_CHOICES, STYLE_PRESETS, SIZE_PRESETS, MERMAID_THEMES, MERMAID_CURVES, FONT_CHOICES, listFonts };

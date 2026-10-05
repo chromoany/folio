@@ -114,6 +114,17 @@ function freshCli() {
   return require(cliPath);
 }
 
+// 数值型排版参数：界面传数字，这里换算成 Typst 长度（unit='pt'/'mm'）；未传或空串 = 用默认值。
+// 越界直接拒绝，避免一个手滑的 0 或 999 排版成一页一个字（或让 typst 编译失败）。
+function clipNum(v, zhLabel, enLabel, lo, hi, unit) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < lo || n > hi) {
+    throw new Error(L(`${zhLabel}应在 ${lo}–${hi} 之间`, `${enLabel} must be between ${lo} and ${hi}`));
+  }
+  return unit ? n + unit : n;
+}
+
 function openPath(p) {
   // start 的第一个参数是窗口标题，必须留一个空字符串占位；路径里的引号一律去掉，防 cmd 元字符注入
   spawn('cmd', ['/c', 'start', '', String(p).replace(/"/g, '')], { stdio: 'ignore', detached: true, windowsHide: true }).unref();
@@ -179,8 +190,10 @@ async function handle(req, res) {
     }
 
     if (req.method === 'GET' && u.pathname === '/api/fonts') {
-      // 字体三档的候选清单：常用项（FONT_CHOICES）+ 已装字族（`typst fonts` 现查，成功一次即缓存）。
-      // 查不到时 installed = null，界面只用常用项 + 默认值，不影响转换。
+      // 界面「选项」卡片所需的一切元数据，单一来源都是 bin/folio.cjs（别在 html 里再抄一份）：
+      //   三档字族的候选清单（FONT_CHOICES + 本机已装字族，`typst fonts` 现查、成功一次即缓存）
+      //   两个方案（STYLE_PRESETS / SIZE_PRESETS）：简单模式选它、详细模式按它填字段
+      //   各类默认值（font / page / heading）与纸张清单：详细模式各项的兜底与下拉项
       const fresh = freshCli();
       let installed = null;
       try { installed = fresh.listFonts(); } catch (_) { installed = null; }
@@ -188,7 +201,12 @@ async function handle(req, res) {
         ok: true,
         installed,
         choices: fresh.FONT_CHOICES,
-        defaults: fresh.DEFAULTS.font,
+        defaults: fresh.DEFAULTS.font, // 字号方案 default 档 = 这里的值（0.8em 之外的默认字号都在内）
+        page: fresh.DEFAULTS.page,
+        papers: fresh.PAPERS,
+        heading: fresh.DEFAULTS.heading,
+        styles: fresh.STYLE_PRESETS,
+        sizes: fresh.SIZE_PRESETS,
       });
       return;
     }
@@ -224,6 +242,14 @@ async function handle(req, res) {
       const files = (b.files || []).filter((f) => f && f.name);
       if (!files.length) throw new Error(L('请先选择要转换的 .md 文件', 'Please select the .md file(s) to convert first'));
 
+      // 调节方式（界面「简单 / 详细」两档）：
+      //   简单 = 只认两个方案（style / preset）+ 书名、输出、目录、分页、远程图这些文档级开关，
+      //          字体/字号/行距/纸张/页边距/标题样式/mermaid 一律按下不表（由方案基线决定）。
+      //   详细 = 逐项都认，显式给的值压过方案基线。
+      // 界面在简单模式下本就不发这些字段，这里再挡一道，免得旧界面或手写请求把「简单」悄悄变成「详细」。
+      const simple = String(b.mode || '') === 'simple';
+      const pick = (v) => (simple ? undefined : v);
+
       const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
       const runDir = path.join(RUNS, id);
       const inputDir = path.join(runDir, 'inputs');
@@ -241,46 +267,93 @@ async function handle(req, res) {
       // 每次转换都重新加载最新 folio.cjs，避免旧服务驻留旧代码导致旧效果
       const fresh = freshCli();
       // 行距：只收 Typst 长度（如 1em / 1.2em / 11pt），乱值直接拒绝，避免拼进排版模板
-      const leading = String(b.leading || '').trim();
+      const leading = String(pick(b.leading) || '').trim();
       if (leading && !/^\d+(\.\d+)?(em|pt|mm|cm|in)$/.test(leading)) {
         throw new Error(L('行距格式不对，应为如 1em / 11pt 这样的长度', 'Invalid line spacing — use a length like 1em / 11pt'));
       }
       // mermaid 图的主题/连线曲线：口味型配置，界面下拉选择；白名单外的值直接拒绝
-      const mermaidTheme = String(b.mermaidTheme || '').trim();
-      const mermaidCurve = String(b.mermaidCurve || '').trim();
+      const mermaidTheme = String(pick(b.mermaidTheme) || '').trim();
+      const mermaidCurve = String(pick(b.mermaidCurve) || '').trim();
       if (mermaidTheme && !fresh.MERMAID_THEMES.includes(mermaidTheme)) {
         throw new Error(L('不支持的 mermaid 主题：' + mermaidTheme, 'Unsupported mermaid theme: ' + mermaidTheme));
       }
       if (mermaidCurve && !fresh.MERMAID_CURVES.includes(mermaidCurve)) {
         throw new Error(L('不支持的 mermaid 连线曲线：' + mermaidCurve, 'Unsupported mermaid line curve: ' + mermaidCurve));
       }
-      // 字体三档（中文 / 西文 / 等宽）：只为合法性把关，是否装机由 build() 查已装清单后在日志里提示
-      const fontCjk = safeFont(b.fontCjk);
-      const fontLatin = safeFont(b.fontLatin);
-      const fontMono = safeFont(b.fontMono);
-      const cfg = {
+      // 版式方案 / 字号方案：口味型配置，界面下拉选择；白名单外的值直接拒绝
+      const style = String(b.style || '').trim();
+      if (style && !fresh.STYLE_CHOICES.includes(style)) {
+        throw new Error(L('不支持的版式方案：' + style, 'Unsupported layout preset: ' + style));
+      }
+      const preset = String(b.preset || '').trim();
+      if (preset && preset !== 'default' && !fresh.SIZE_PRESETS[preset]) {
+        throw new Error(L('不支持的字号方案：' + preset, 'Unsupported font size preset: ' + preset));
+      }
+      // 字体四档（中文 / 西文 / 等宽 / 等宽中文）：只为合法性把关，是否装机由 build() 查已装清单后在日志里提示。
+      // 未传 = 用默认值；西文传空串 = 「跟随中文字体」（要与「未传」区分开，不能一并丢掉）。
+      const font = {};
+      if (!simple) {
+        const cjk = safeFont(b.fontCjk);
+        if (cjk) font.cjk = cjk;
+        if (b.fontLatin !== undefined) font.latin = safeFont(b.fontLatin);
+        const mono = safeFont(b.fontMono);
+        if (mono) font.mono = mono;
+        const monoCjk = safeFont(b.fontMonoCjk);
+        if (monoCjk) font.monoCjk = monoCjk;
+      }
+      // 字号（详细模式）：正文 / 代码块 / 一至四级标题，单位 pt
+      if (!simple) {
+        const size = clipNum(b.size, '正文字号', 'Body font size', 5, 40, 'pt');
+        const monoSize = clipNum(b.monoSize, '代码字号', 'Code font size', 5, 40, 'pt');
+        if (size) font.size = size;
+        if (monoSize) font.monoSize = monoSize;
+        const headSizes = [[1, '一级标题字号', 'H1 size'], [2, '二级标题字号', 'H2 size'], [3, '三级标题字号', 'H3 size'], [4, '四级标题字号', 'H4 size']];
+        for (const [lvl, zh, en] of headSizes) {
+          // 标题字号在模板里自带 pt 后缀（{{HEADING_SIZES}} 是 `size: ${h1}pt`），所以这里只传数字
+          const v = clipNum(b['h' + lvl], zh, en, 5, 48);
+          if (v) font['h' + lvl] = v;
+        }
+      }
+      // 页面（详细模式）：纸张 + 左右/上下页边距（mm）
+      const page = {};
+      if (!simple) {
+        const paper = String(b.paper || '').trim();
+        if (paper && !fresh.PAPERS.includes(paper)) {
+          throw new Error(L('不支持的纸张：' + paper, 'Unsupported paper size: ' + paper));
+        }
+        if (paper) page.paper = paper;
+        const marginX = clipNum(b.marginX, '左右页边距', 'Side margin', 5, 60, 'mm');
+        const marginY = clipNum(b.marginY, '上下页边距', 'Top/bottom margin', 5, 60, 'mm');
+        if (marginX) page.marginX = marginX;
+        if (marginY) page.marginY = marginY;
+      }
+      // 标题样式开关（详细模式）：只认布尔值，未传就交给方案基线 / 默认值
+      const heading = {};
+      if (!simple) {
+        for (const [key, field] of [['center', 'headingCenter'], ['rule', 'headingRule'], ['cjkStyles', 'headingCjkStyles']]) {
+          if (typeof b[field] === 'boolean') heading[key] = b[field];
+        }
+      }
+      // 方案基线 + 显式字段的合并交给 resolveConfig（与 CLI 同一份逻辑），别在这里再手写一遍 merge
+      const cfg = fresh.resolveConfig({
         inputs,
         output,
         title: b.title || '',
         subtitle: b.subtitle || '',
         chapterBreak: b.chapterBreak !== false,
         toc: { enabled: b.toc !== false, title: L('目录', 'Contents'), depth: Number(b.tocDepth) || 3 },
-        page: { paper: 'a4', marginX: '20mm', marginY: '18mm' },
-        font: {
-          ...fresh.DEFAULTS.font, // 字号/行距/字体默认值单一来源，别在这里再写一份
-          ...(leading ? { leading } : {}),
-          ...(fontCjk ? { cjk: fontCjk } : {}),
-          ...(fontLatin ? { latin: fontLatin } : {}),
-          ...(fontMono ? { mono: fontMono } : {}),
-        },
-        mermaid: { ...fresh.DEFAULTS.mermaid, ...(mermaidTheme ? { theme: mermaidTheme } : {}), ...(mermaidCurve ? { curve: mermaidCurve } : {}) }, // mermaid 主题/连线曲线，同上
+        style: style || undefined,
+        font,
+        heading,
+        page,
+        mermaid: { ...(mermaidTheme ? { theme: mermaidTheme } : {}), ...(mermaidCurve ? { curve: mermaidCurve } : {}) },
         images: { fetchRemote: b.fetchRemote === true }, // 远程图片联网抓取（默认关，占位文字排版）
         // 本地图片按 md 原始目录解析：Electron 经 preload 传真实路径（f.path），
         // 浏览器拿不到路径时退回旧行为——图片以占位文字排版并在日志提示
         sourceDirs: [...new Set(files.map((f) => (f.path ? path.dirname(path.resolve(String(f.path))) : null)).filter(Boolean))],
         renderMermaid: mermaidRender || undefined, // mermaid 图渲染（桌面版才有，纯 node 保留代码块）
         lang: settings.get('language'), // 转换日志/错误提示随界面语言
-      };
+      }, style || undefined);
       const logs = [];
       const r = await fresh.build(cfg, { log: (m) => logs.push(m) });
       trackOpenable(r.output);

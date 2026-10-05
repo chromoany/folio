@@ -113,6 +113,16 @@
   .checks { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; margin-top: 4px; }
   .checks label { display: flex; align-items: center; gap: 6px; color: var(--txt); }
   .checks input { accent-color: var(--accent); }
+  /* ---- 调节方式（简单 / 详细）----
+     「详细」档才露出的字段统一标 data-detail；简单档只留两套方案 + 书名/输出/几个文档级开关。
+     注意：简单档不只是隐藏，提交时也不会带这些字段（后端同样按 mode 挡一道），见 go 的 click 处理。 */
+  .modes { display: flex; gap: 8px; }
+  .modes button { flex: 1; border: 1px solid var(--line); background: var(--field); color: var(--mut); border-radius: 8px; padding: 9px 12px; font-size: 13px; font-family: inherit; cursor: pointer; transition: .12s; }
+  .modes button:hover { border-color: var(--accent); }
+  .modes button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  body[data-mode="simple"] [data-detail] { display: none !important; }
+  /* 「详细」档里的分组小标题：用细线把长表单切开，省得一眼望不到头 */
+  .sub { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--mut); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; letter-spacing: .02em; }
   .btn { border: 0; border-radius: 10px; padding: 13px 22px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .btn.primary { background: var(--accent); color: var(--on-accent); width: 100%; }
   .btn.primary:hover { background: var(--accent-hover); }
@@ -162,9 +172,76 @@
   <div class="card">
     <h2 data-i18n="step2Card">② 选项</h2>
     <div class="grid">
+      <div class="field full">
+        <label data-i18n="lblMode">调节方式</label>
+        <div class="modes" id="modes">
+          <button type="button" data-mode="simple" data-i18n="modeSimple">简单（挑方案）</button>
+          <button type="button" data-mode="detailed" data-i18n="modeDetailed">详细（逐项调）</button>
+        </div>
+        <div class="hint" id="modeHint"></div>
+      </div>
       <div class="field"><label data-i18n="lblTitle">书名</label><input type="text" id="title" data-i18n-ph="phTitle" placeholder="留空则不生成书名页"></div>
       <div class="field"><label data-i18n="lblSubtitle">副标题</label><input type="text" id="subtitle" data-i18n-ph="phSubtitle" placeholder="可选"></div>
-      <div class="field"><label data-i18n="lblTocDepth">目录深度（列到几级标题）</label>
+      <div class="field"><label data-i18n="lblStyle">版式方案</label>
+        <select id="style">
+          <option value="default" selected data-i18n="styleDefault">默认（书版式：一级标题带下划线）</option>
+          <option value="ctexart" data-i18n="styleCtexart">ctexart（宋体正文、黑体标题、标题居中无下划线）</option>
+        </select>
+        <div class="hint" data-i18n="styleHint">只改版式口味。切换时会把该方案的一套默认值填进「详细」档的各项（字体、行距、字号、标题样式），填完仍可逐个改回来。</div>
+      </div>
+      <div class="field"><label data-i18n="lblPreset">字号方案</label>
+        <select id="preset">
+          <option value="default" selected data-i18n="presetDefault">默认（原有字号：正文 10.5pt / 代码 8pt）</option>
+          <option value="small" data-i18n="presetSmall">小（小五 9pt / 代码 7pt）</option>
+          <option value="normal" data-i18n="presetNormal">标准（五号 10.5pt，标题按 LaTeX 层级）</option>
+          <option value="large" data-i18n="presetLarge">大（小四 12pt / 代码 9pt）</option>
+        </select>
+        <div class="hint" data-i18n="presetHint">一套含正文 + 代码块 + 各级标题的字号（三档取自 ctexart 的中文字号体系）；切换时同样会填进「详细」档的字号框。</div>
+      </div>
+
+      <div class="sub" data-detail data-i18n="secFont">字体</div>
+      <div class="field" data-detail><label data-i18n="lblFontCjk">正文字体（中文）</label>
+        <select id="fontCjk"><option value="Microsoft YaHei" selected>Microsoft YaHei</option></select>
+      </div>
+      <div class="field" data-detail><label data-i18n="lblFontLatin">英文字体（字母数字）</label>
+        <select id="fontLatin"><option value="" selected data-i18n="fontFollowCjk">跟随中文字体</option></select>
+      </div>
+      <div class="field" data-detail><label data-i18n="lblFontMono">代码等宽字体</label>
+        <select id="fontMono"><option value="Consolas" selected>Consolas</option></select>
+      </div>
+      <div class="field" data-detail><label data-i18n="lblFontMonoCjk">代码等宽中文字体</label>
+        <select id="fontMonoCjk"><option value="NSimSun" selected>NSimSun</option></select>
+        <div class="hint" data-i18n="fontHint">四档字族分类同 LaTeX：中文（CJKmainfont）/ 西文（mainfont）/ 等宽（ttfamily）/ 等宽中文（等宽族里的汉字）。列表取本机 typst 能用的字体，未安装的会标注并在转换日志里提示；任意字族名可用命令行 --font-cjk / --font-latin / --font-mono 或配置 font.cjk / font.latin / font.mono / font.monoCjk。</div>
+      </div>
+
+      <div class="sub" data-detail data-i18n="secSize">字号与行距</div>
+      <div class="field" data-detail><label data-i18n="lblSize">正文字号（pt）</label><input type="number" id="size" min="5" max="40" step="0.5" value="10.5"></div>
+      <div class="field" data-detail><label data-i18n="lblMonoSize">代码字号（pt）</label><input type="number" id="monoSize" min="5" max="40" step="0.5" value="8"></div>
+      <div class="field" data-detail><label data-i18n="lblH1">一级标题字号（pt）</label><input type="number" id="h1" min="5" max="48" step="1" value="16"></div>
+      <div class="field" data-detail><label data-i18n="lblH2">二级标题字号（pt）</label><input type="number" id="h2" min="5" max="48" step="1" value="14"></div>
+      <div class="field" data-detail><label data-i18n="lblH3">三级标题字号（pt）</label><input type="number" id="h3" min="5" max="48" step="1" value="12"></div>
+      <div class="field" data-detail><label data-i18n="lblH4">四级标题字号（pt）</label><input type="number" id="h4" min="5" max="48" step="1" value="11"></div>
+      <div class="field" data-detail><label data-i18n="lblLeading">行距</label>
+        <select id="leading">
+          <option value="0.8em" data-i18n="leadTight">紧凑（0.8em）</option>
+          <option value="0.85em" data-i18n="leadTight2">较紧凑（0.85em）</option>
+          <option value="1em" selected data-i18n="leadNormal">标准（1em，默认）</option>
+          <option value="1.2em" data-i18n="leadLoose">宽松（1.2em）</option>
+          <option value="1.4em" data-i18n="leadXLoose">更宽松（1.4em）</option>
+        </select>
+        <div class="hint" data-i18n="leadingHint">影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。</div>
+      </div>
+
+      <div class="sub" data-detail data-i18n="secPage">页面</div>
+      <div class="field" data-detail><label data-i18n="lblPaper">纸张</label>
+        <select id="paper">
+          <option value="a4" selected data-i18n="paperA4">A4（210 × 297 mm，默认）</option>
+          <option value="a5" data-i18n="paperA5">A5（148 × 210 mm，小册子）</option>
+          <option value="b5" data-i18n="paperB5">B5（176 × 250 mm）</option>
+          <option value="us-letter" data-i18n="paperLetter">Letter（216 × 279 mm）</option>
+        </select>
+      </div>
+      <div class="field" data-detail><label data-i18n="lblTocDepth">目录深度（列到几级标题）</label>
         <select id="tocDepth">
           <option value="1" data-i18n="toc1">1 级（仅章）</option>
           <option value="2" data-i18n="toc2">2 级（章 + 节）</option>
@@ -172,26 +249,21 @@
           <option value="4" data-i18n="toc4">4 级</option>
         </select>
       </div>
-      <div class="field"><label data-i18n="lblLeading">行距</label>
-        <select id="leading">
-          <option value="0.85em" data-i18n="leadTight">紧凑（0.85em）</option>
-          <option value="1em" selected data-i18n="leadNormal">标准（1em，默认）</option>
-          <option value="1.2em" data-i18n="leadLoose">宽松（1.2em）</option>
-          <option value="1.4em" data-i18n="leadXLoose">更宽松（1.4em）</option>
-        </select>
-        <div class="hint" data-i18n="leadingHint">影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。</div>
+      <div class="field" data-detail><label data-i18n="lblMarginX">左右页边距（mm）</label><input type="number" id="marginX" min="5" max="60" step="1" value="20"></div>
+      <div class="field" data-detail><label data-i18n="lblMarginY">上下页边距（mm）</label><input type="number" id="marginY" min="5" max="60" step="1" value="18"></div>
+
+      <div class="sub" data-detail data-i18n="secHeading">标题样式</div>
+      <div class="field full" data-detail>
+        <div class="checks">
+          <label><input type="checkbox" id="headingCenter"> <span data-i18n="chkHeadingCenter">一级标题（含目录标题）居中</span></label>
+          <label><input type="checkbox" id="headingRule" checked> <span data-i18n="chkHeadingRule">标题下划线</span></label>
+          <label><input type="checkbox" id="headingCjkStyles"> <span data-i18n="chkHeadingCjk">中文粗体走黑体、斜体走楷体</span></label>
+        </div>
+        <div class="hint" data-i18n="headingHint">默认即原有的书版式（左对齐 + 下划线 + 中文用字族自带的粗体）；ctexart 方案给的是居中 + 无下划线 + 黑体楷体。</div>
       </div>
-      <div class="field"><label data-i18n="lblFontCjk">正文字体（中文）</label>
-        <select id="fontCjk"><option value="Microsoft YaHei" selected>Microsoft YaHei</option></select>
-      </div>
-      <div class="field"><label data-i18n="lblFontLatin">英文字体（字母数字）</label>
-        <select id="fontLatin"><option value="" selected data-i18n="fontFollowCjk">跟随中文字体</option></select>
-      </div>
-      <div class="field"><label data-i18n="lblFontMono">代码等宽字体</label>
-        <select id="fontMono"><option value="Consolas" selected>Consolas</option></select>
-        <div class="hint" data-i18n="fontHint">三档字族分类同 LaTeX：中文（CJKmainfont）/ 西文（mainfont）/ 等宽（ttfamily）。列表取本机 typst 能用的字体，未安装的会标注并在转换日志里提示；任意字族名可用命令行 --font-cjk / --font-latin / --font-mono 或配置 font.cjk / font.latin / font.mono。</div>
-      </div>
-      <div class="field"><label data-i18n="lblMermaidTheme">mermaid 图主题</label>
+
+      <div class="sub" data-detail data-i18n="secDiagram">mermaid 图</div>
+      <div class="field" data-detail><label data-i18n="lblMermaidTheme">mermaid 图主题</label>
         <select id="mermaidTheme">
           <option value="default" data-i18n="mmThemeDefault">经典（default）</option>
           <option value="neutral" selected data-i18n="mmThemeNeutral">中性（neutral，默认）</option>
@@ -200,7 +272,7 @@
           <option value="base" data-i18n="mmThemeBase">基础（base）</option>
         </select>
       </div>
-      <div class="field"><label data-i18n="lblMermaidCurve">mermaid 连线样式</label>
+      <div class="field" data-detail><label data-i18n="lblMermaidCurve">mermaid 连线样式</label>
         <select id="mermaidCurve">
           <option value="basis" selected data-i18n="mmCurveBasis">圆润（basis，默认）</option>
           <option value="linear" data-i18n="mmCurveLinear">直线（linear）</option>
@@ -209,7 +281,8 @@
         </select>
         <div class="hint" data-i18n="mermaidHint">只影响文档里 mermaid 图的配色与连线走向；mermaid 图只在桌面版渲染进 PDF，命令行模式保留为代码块。</div>
       </div>
-      <div class="field"><label data-i18n="lblOutput">输出 PDF 路径（留空则下载）</label><input type="text" id="output" data-i18n-ph="phOutput" placeholder="如 D:\...\书.pdf"></div>
+
+      <div class="field full"><label data-i18n="lblOutput">输出 PDF 路径（留空则下载）</label><input type="text" id="output" data-i18n-ph="phOutput" placeholder="如 D:\...\书.pdf"></div>
       <div class="field full">
         <div class="checks">
           <label><input type="checkbox" id="toc" checked> <span data-i18n="chkToc">生成目录</span></label>
@@ -281,6 +354,13 @@
       step1Card: '① 选择 Markdown 文件（可多选，顺序即章节顺序）',
       dropHtml: '把 <b>.md 文件拖到这里</b>，或点击选择',
       step2Card: '② 选项',
+      lblMode: '调节方式',
+      modeSimple: '简单（挑方案）',
+      modeDetailed: '详细（逐项调）',
+      modeHintSimple: '简单：只挑下面两套方案（版式 + 字号）就能出片。字体、字号、行距、纸张、页边距、标题样式一律用方案自带的默认值 —— 想逐项改就切到「详细」。',
+      modeHintDetailed: '详细：下面每一项都能单独调。切换方案会把该方案的一整套默认值填进各项，填完仍可随便改；你改过的值永远最后生效（方案只是默认值，不是开关）。',
+      modeTagSimple: '简单模式：只按两套方案排版',
+      modeTagDetailed: '详细模式：逐项都生效',
       lblTitle: '书名',
       phTitle: '留空则不生成书名页',
       lblSubtitle: '副标题',
@@ -290,19 +370,53 @@
       toc2: '2 级（章 + 节）',
       toc3: '3 级（章 + 节 + 小节）',
       toc4: '4 级',
+      lblStyle: '版式方案',
+      styleDefault: '默认（书版式：一级标题带下划线）',
+      styleCtexart: 'ctexart（宋体正文、黑体标题、标题居中无下划线）',
+      styleHint: '只改版式口味。切换时会把该方案的一整套默认值填进「详细」档（字体、行距、字号、标题样式），填完仍可逐个改回来。',
+      lblPreset: '字号方案',
+      presetDefault: '默认（原有字号：正文 10.5pt / 代码 8pt）',
+      presetSmall: '小（小五 9pt / 代码 7pt）',
+      presetNormal: '标准（五号 10.5pt，标题按 LaTeX 层级）',
+      presetLarge: '大（小四 12pt / 代码 9pt）',
+      presetHint: '一套含正文 + 代码块 + 各级标题的字号（三档取自 ctexart 的中文字号体系）；切换时同样会填进「详细」档的字号框。',
       lblLeading: '行距',
-      leadTight: '紧凑（0.85em）',
+      leadTight: '紧凑（0.8em）',
+      leadTight2: '较紧凑（0.85em）',
       leadNormal: '标准（1em，默认）',
       leadLoose: '宽松（1.2em）',
       leadXLoose: '更宽松（1.4em）',
       leadingHint: '影响 PDF 正文行距与各级标题上下的间距；任意值可用命令行 --leading（如 1.1em）。',
+      secFont: '字体',
+      secSize: '字号与行距',
+      secPage: '页面',
+      secHeading: '标题样式',
+      secDiagram: 'mermaid 图',
       lblFontCjk: '正文字体（中文）',
       lblFontLatin: '英文字体（字母数字）',
       lblFontMono: '代码等宽字体',
+      lblFontMonoCjk: '代码等宽中文字体',
       fontFollowCjk: '跟随中文字体',
       fontInstalledGroup: '其他已装字体',
       fontMissingTag: '（未安装）',
-      fontHint: '三档字族分类同 LaTeX：中文（CJKmainfont）/ 西文（mainfont）/ 等宽（ttfamily）。列表取本机 typst 能用的字体，未安装的会标注并在转换日志里提示；任意字族名可用命令行 --font-cjk / --font-latin / --font-mono 或配置 font.cjk / font.latin / font.mono。',
+      fontHint: '四档字族分类同 LaTeX：中文（CJKmainfont）/ 西文（mainfont）/ 等宽（ttfamily）/ 等宽中文（等宽族里的汉字）。列表取本机 typst 能用的字体，未安装的会标注并在转换日志里提示；任意字族名可用命令行 --font-cjk / --font-latin / --font-mono 或配置 font.cjk / font.latin / font.mono / font.monoCjk。',
+      lblSize: '正文字号（pt）',
+      lblMonoSize: '代码字号（pt）',
+      lblH1: '一级标题字号（pt）',
+      lblH2: '二级标题字号（pt）',
+      lblH3: '三级标题字号（pt）',
+      lblH4: '四级标题字号（pt）',
+      lblPaper: '纸张',
+      paperA4: 'A4（210 × 297 mm，默认）',
+      paperA5: 'A5（148 × 210 mm，小册子）',
+      paperB5: 'B5（176 × 250 mm）',
+      paperLetter: 'Letter（216 × 279 mm）',
+      lblMarginX: '左右页边距（mm）',
+      lblMarginY: '上下页边距（mm）',
+      chkHeadingCenter: '一级标题（含目录标题）居中',
+      chkHeadingRule: '标题下划线',
+      chkHeadingCjk: '中文粗体走黑体、斜体走楷体',
+      headingHint: '默认即原有的书版式（左对齐 + 下划线 + 中文用字族自带的粗体）；ctexart 方案给的是居中 + 无下划线 + 黑体楷体。',
       lblMermaidTheme: 'mermaid 图主题',
       mmThemeDefault: '经典（default）',
       mmThemeNeutral: '中性（neutral，默认）',
@@ -361,6 +475,13 @@
       step1Card: '① Select Markdown files (multi-select — order = chapter order)',
       dropHtml: 'Drag &amp; drop <b>.md files here</b>, or click to select',
       step2Card: '② Options',
+      lblMode: 'How much to adjust',
+      modeSimple: 'Simple (pick a preset)',
+      modeDetailed: 'Detailed (tune everything)',
+      modeHintSimple: 'Simple: just pick the two presets below (layout + font size) and you are done. Fonts, sizes, line spacing, paper, margins and heading style all follow the presets — switch to Detailed to change them one by one.',
+      modeHintDetailed: 'Detailed: every field below can be set on its own. Switching a preset fills its defaults into the fields, and you can then change any of them; whatever you set always wins (a preset is just a set of defaults, not a switch).',
+      modeTagSimple: 'Simple mode: presets only',
+      modeTagDetailed: 'Detailed mode: every field applies',
       lblTitle: 'Book title',
       phTitle: 'Leave empty to skip the title page',
       lblSubtitle: 'Subtitle',
@@ -370,19 +491,53 @@
       toc2: 'Level 2 (chapters + sections)',
       toc3: 'Level 3 (chapters + sections + subsections)',
       toc4: 'Level 4',
+      lblStyle: 'Layout preset',
+      styleDefault: 'Default (book layout: ruled level-1 headings)',
+      styleCtexart: 'ctexart (SimSun body, SimHei headings, centered unruled headings)',
+      styleHint: 'Changes the layout flavour only. Switching fills the whole set of that preset into the Detailed fields (fonts, line spacing, sizes, heading style) — every one of them can still be changed afterwards.',
+      lblPreset: 'Font size preset',
+      presetDefault: 'Default (original: body 10.5pt / code 8pt)',
+      presetSmall: 'Small (9pt body / 7pt code)',
+      presetNormal: 'Normal (10.5pt body, LaTeX heading levels)',
+      presetLarge: 'Large (12pt body / 9pt code)',
+      presetHint: 'One coordinated set covering body, code block and heading sizes (the three steps follow the ctexart Chinese size system); switching it also fills the size fields in Detailed mode.',
       lblLeading: 'Line spacing',
-      leadTight: 'Tight (0.85em)',
+      leadTight: 'Tight (0.8em)',
+      leadTight2: 'Fairly tight (0.85em)',
       leadNormal: 'Normal (1em, default)',
       leadLoose: 'Loose (1.2em)',
       leadXLoose: 'Extra loose (1.4em)',
       leadingHint: 'Affects body line spacing and heading spacing in the PDF; use the CLI flag --leading (e.g. 1.1em) for an exact value.',
+      secFont: 'Fonts',
+      secSize: 'Sizes & line spacing',
+      secPage: 'Page',
+      secHeading: 'Heading style',
+      secDiagram: 'Mermaid diagrams',
       lblFontCjk: 'Body font (Chinese)',
       lblFontLatin: 'Latin font (letters & digits)',
       lblFontMono: 'Monospace font (code)',
+      lblFontMonoCjk: 'Monospace CJK font',
       fontFollowCjk: 'Follow the Chinese font',
       fontInstalledGroup: 'Other installed fonts',
       fontMissingTag: ' (not installed)',
-      fontHint: 'Three families, classified like LaTeX: Chinese (CJKmainfont) / Latin (mainfont) / monospace (ttfamily). The lists come from the fonts typst can use on this machine; missing ones are marked and reported in the conversion log. Any family name works via --font-cjk / --font-latin / --font-mono or font.cjk / font.latin / font.mono in the config.',
+      fontHint: 'Four families, classified like LaTeX: Chinese (CJKmainfont) / Latin (mainfont) / monospace (ttfamily) / monospace CJK (the Chinese glyphs inside code). The lists come from the fonts typst can use on this machine; missing ones are marked and reported in the conversion log. Any family name works via font.cjk / font.latin / font.mono / font.monoCjk in the config.',
+      lblSize: 'Body font size (pt)',
+      lblMonoSize: 'Code font size (pt)',
+      lblH1: 'H1 size (pt)',
+      lblH2: 'H2 size (pt)',
+      lblH3: 'H3 size (pt)',
+      lblH4: 'H4 size (pt)',
+      lblPaper: 'Paper size',
+      paperA4: 'A4 (210 × 297 mm, default)',
+      paperA5: 'A5 (148 × 210 mm, booklet)',
+      paperB5: 'B5 (176 × 250 mm)',
+      paperLetter: 'Letter (216 × 279 mm)',
+      lblMarginX: 'Side margins (mm)',
+      lblMarginY: 'Top/bottom margins (mm)',
+      chkHeadingCenter: 'Center level-1 headings (and the TOC title)',
+      chkHeadingRule: 'Underline headings',
+      chkHeadingCjk: 'Chinese bold → SimHei, italic → KaiTi',
+      headingHint: 'The default is the original book layout (left-aligned, underlined, Chinese bold from the family itself); the ctexart preset uses centered, unruled headings with SimHei/KaiTi.',
       lblMermaidTheme: 'Mermaid diagram theme',
       mmThemeDefault: 'Classic (default)',
       mmThemeNeutral: 'Neutral (default)',
@@ -449,6 +604,9 @@
     document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
     document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
     document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+    // 调节方式的提示文案随语言走（它由 JS 按当前档位填写，不是静态 data-i18n）
+    const mh = document.getElementById('modeHint');
+    if (mh) mh.textContent = t(uiMode === 'detailed' ? 'modeHintDetailed' : 'modeHintSimple');
     const langSel = document.getElementById('languageSel');
     if (langSel) langSel.value = cur;
     renderList();
@@ -522,7 +680,8 @@
       flist.appendChild(it);
     });
     go.disabled = files.length === 0;
-    hint.textContent = t('filesSelected', files.length);
+    hint.textContent = [t('filesSelected', files.length), t(uiMode === 'detailed' ? 'modeTagDetailed' : 'modeTagSimple')]
+      .filter(Boolean).join(' · ');
   }
 
   go.addEventListener('click', async () => {
@@ -532,6 +691,9 @@
     logEl.style.display = 'block';
     logEl.textContent = t('preparing');
     try {
+      const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+      const checked = (id) => { const el = document.getElementById(id); return el ? el.checked : undefined; };
+      const numVal = (id) => { const v = val(id); return v === '' ? undefined : Number(v); };
       const payload = {
         files: await Promise.all(files.map(async (f) => ({
           name: f.name,
@@ -539,20 +701,37 @@
           // 真实路径（Electron 经 preload 提供）：本地图片按 md 原始目录解析，浏览器里为空
           path: (window.folio && window.folio.getPathForFile) ? (window.folio.getPathForFile(f) || null) : null,
         }))),
-        title: document.getElementById('title').value.trim(),
-        subtitle: document.getElementById('subtitle').value.trim(),
-        tocDepth: Number(document.getElementById('tocDepth').value),
-        leading: document.getElementById('leading').value,
-        fontCjk: document.getElementById('fontCjk').value,
-        fontLatin: document.getElementById('fontLatin').value,
-        fontMono: document.getElementById('fontMono').value,
-        mermaidTheme: document.getElementById('mermaidTheme').value,
-        mermaidCurve: document.getElementById('mermaidCurve').value,
-        toc: document.getElementById('toc').checked,
-        chapterBreak: document.getElementById('chapterBreak').checked,
-        fetchRemote: document.getElementById('fetchRemote').checked,
-        output: document.getElementById('output').value.trim() || null,
+        mode: uiMode,
+        title: val('title').trim(),
+        subtitle: val('subtitle').trim(),
+        style: val('style'),
+        preset: val('preset'),
+        toc: checked('toc'),
+        chapterBreak: checked('chapterBreak'),
+        fetchRemote: checked('fetchRemote'),
+        output: val('output').trim() || null,
       };
+      // 逐项参数只在「详细」档提交；简单档一个都不发（后端也会按 mode 忽略），
+      // 于是简单档一定按方案基线与默认值排版，不会被之前调过又藏起来的数值悄悄影响。
+      if (uiMode === 'detailed') Object.assign(payload, {
+        tocDepth: Number(val('tocDepth')),
+        leading: val('leading'),
+        fontCjk: val('fontCjk'),
+        fontLatin: val('fontLatin'), // '' = 跟随中文字体，必须照发
+        fontMono: val('fontMono'),
+        fontMonoCjk: val('fontMonoCjk'),
+        size: numVal('size'),
+        monoSize: numVal('monoSize'),
+        h1: numVal('h1'), h2: numVal('h2'), h3: numVal('h3'), h4: numVal('h4'),
+        paper: val('paper'),
+        marginX: numVal('marginX'),
+        marginY: numVal('marginY'),
+        headingCenter: checked('headingCenter'),
+        headingRule: checked('headingRule'),
+        headingCjkStyles: checked('headingCjkStyles'),
+        mermaidTheme: val('mermaidTheme'),
+        mermaidCurve: val('mermaidCurve'),
+      });
       logEl.textContent = t('uploading');
       const r = await fetch('/api/convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const j = await r.json();
@@ -624,7 +803,7 @@
   function renderFontSelects() {
     const installed = fontData && Array.isArray(fontData.installed) ? new Set(fontData.installed) : null;
     const choices = (fontData && fontData.choices) || {};
-    const bind = [['fontCjk', 'cjk', false], ['fontLatin', 'latin', true], ['fontMono', 'mono', false]];
+    const bind = [['fontCjk', 'cjk', false], ['fontLatin', 'latin', true], ['fontMono', 'mono', false], ['fontMonoCjk', 'monoCjk', false]];
     for (const [id, key, followOption] of bind) {
       const sel = document.getElementById(id);
       if (sel) buildFontSelect(sel, choices[key], installed, followOption);
@@ -641,6 +820,78 @@
     }
     if (fontData) renderFontSelects();
   }
+
+  // ---- 方案 → 字段 ----
+  // 切换方案时把该方案的一整套默认值「填进」下面的各项（字体 / 字号 / 行距 / 标题样式），
+  // 全部可见可改 —— 方案只是默认值，不是覆盖：后端 baseConfig 同样只铺基线，界面显式提交的值永远优先。
+  // 方案自身的清单由 /api/fonts 返回（后端 STYLE_PRESETS / SIZE_PRESETS 是唯一来源）。
+  function setSelect(id, v) {
+    const sel = document.getElementById(id);
+    if (!sel || v == null) return;
+    if ([...sel.options].some((o) => o.value === String(v))) sel.value = String(v);
+  }
+  // 数值框：接受 '10.5pt' / 10.5 / 16，取不出数就保持原值（别把用户/默认值清成空）
+  function setNum(id, v) {
+    const el = document.getElementById(id);
+    const n = parseFloat(v);
+    if (el && Number.isFinite(n)) el.value = String(n);
+  }
+  function setCheck(id, v) {
+    const el = document.getElementById(id);
+    if (el && typeof v === 'boolean') el.checked = v;
+  }
+
+  // 字号方案 → 正文 / 代码块 / 一至四级标题的字号框；default 档 = DEFAULTS 里的原始字号
+  function fillSizes(preset) {
+    const d = (fontData && fontData.defaults) || {};
+    const s = (fontData && fontData.sizes && fontData.sizes[preset]) || d;
+    setNum('size', s.size);
+    setNum('monoSize', s.monoSize);
+    for (const k of ['h1', 'h2', 'h3', 'h4']) setNum(k, s[k]);
+  }
+
+  function applyLayoutPreset(style) {
+    const p = (fontData && fontData.styles && fontData.styles[style]) || null;
+    const d = (fontData && fontData.defaults) || {};
+    const f = (p && p.font) || d; // default 档 = DEFAULTS.font（后端 defaults 同源，别再抄一份硬编码）
+    setSelect('fontCjk', f.cjk);
+    setSelect('fontLatin', f.latin != null ? f.latin : '');
+    setSelect('fontMono', f.mono);
+    setSelect('fontMonoCjk', f.monoCjk);
+    setSelect('leading', (p && p.leading) || d.leading);
+    const preset = (p && p.preset) || 'default';
+    setSelect('preset', preset);
+    fillSizes(preset);
+    const h = (p && p.heading) || (fontData && fontData.heading) || null;
+    if (h) {
+      setCheck('headingCenter', h.center);
+      setCheck('headingRule', h.rule);
+      setCheck('headingCjkStyles', h.cjkStyles);
+    }
+  }
+  const styleSel = document.getElementById('style');
+  if (styleSel) styleSel.addEventListener('change', () => applyLayoutPreset(styleSel.value));
+  const presetSel = document.getElementById('preset');
+  if (presetSel) presetSel.addEventListener('change', () => fillSizes(presetSel.value));
+
+  // ---- 调节方式（简单 / 详细）----
+  // 简单档只留两套方案 + 书名/输出/几个文档级开关（带 data-detail 的字段由 CSS 收起），
+  // 且提交时不带这些字段；后端同样按 mode 再挡一道 —— 所以「简单」是真空档，不只是藏起来。
+  const MODE_KEY = 'folio.mode';
+  let uiMode = 'simple';
+  const modeHint = document.getElementById('modeHint');
+
+  function applyMode(m) {
+    uiMode = m === 'detailed' ? 'detailed' : 'simple';
+    document.body.dataset.mode = uiMode;
+    document.querySelectorAll('#modes button').forEach((b) => b.classList.toggle('on', b.dataset.mode === uiMode));
+    if (modeHint) modeHint.textContent = t(uiMode === 'detailed' ? 'modeHintDetailed' : 'modeHintSimple');
+    try { localStorage.setItem(MODE_KEY, uiMode); } catch (_) {}
+    renderList(); // 顺带刷新「已选 N 个文件 · ×模式」那行提示
+  }
+  document.querySelectorAll('#modes button').forEach((b) => {
+    b.addEventListener('click', () => applyMode(b.dataset.mode));
+  });
 
   // ---- 设置弹窗 ----
   const settingsMask = document.getElementById('settingsMask');
@@ -700,6 +951,10 @@
     if (!savedTheme) { try { savedTheme = localStorage.getItem(THEME_KEY); } catch (_) {} }
     applyTheme(savedTheme, false);   // 服务端设置为准，取不到时沿用首屏脚本用过的缓存值
     applyLang(cur);
+    // 调节方式：上次选的那一档（纯界面偏好，存 localStorage，不进设置文件）
+    let savedMode = null;
+    try { savedMode = localStorage.getItem(MODE_KEY); } catch (_) {}
+    applyMode(savedMode || 'simple');
     await loadFonts();               // 字体下拉：默认项 + 本机已装字族（接口失败就保持默认项）
   })();
 })();

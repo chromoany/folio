@@ -51,7 +51,7 @@ Merging multiple files is nothing special by itself — a one-line Pandoc comman
 
 ## Install
 
-Recommended: download `folio-1.7.13-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
+Recommended: download `folio-1.7.15-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 
@@ -65,6 +65,15 @@ node scripts/setup.cjs   # download pandoc / typst into vendor/
 
 Launch **Folio** from the Start Menu / desktop shortcut (or run `folio.exe`); the standalone window opens: drop in `.md` files → fill in the title, etc. → click "Start" → download the PDF.
 
+At the top of the Options card there are two modes (your choice is remembered):
+
+| Mode | What you get |
+| --- | --- |
+| **Simple (pick a preset)** | Just the two presets: layout + font size. Fonts, sizes, line spacing, paper, margins and heading style all follow the presets |
+| **Detailed (tune everything)** | The two presets plus four font families, seven sizes, line spacing, paper, margins, TOC depth, heading style, mermaid theme & curve — each one adjustable |
+
+Both modes keep the book title, subtitle, output path, "table of contents", "new page per chapter" and "fetch remote images". Switching a preset **fills** its whole set of defaults into the Detailed fields, and you can then change any of them; whatever you set always wins — a preset is a set of defaults, not a switch.
+
 ### CLI
 
 ```bash
@@ -73,7 +82,44 @@ node bin/folio.cjs ch1.md ch2.md -o book.pdf      # merge multiple files
 node bin/folio.cjs -c config.example.json         # use a config file
 ```
 
-Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--leading` (line spacing and heading spacing, default `1em`; try `1.2em` for a looser feel), `--font-cjk` / `--font-latin` / `--font-mono` (body / Latin / monospace font family; any installed family name, a missing one is reported in the log), `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
+The CLI has no modes: passing only `--style` / `--preset` equals the GUI's Simple mode; adding individual flags is Detailed mode.
+
+Common flags: `--title` / `--subtitle`, `--toc-depth N`, `--style` (layout preset: `default` book layout / `ctexart` to match the look of the LaTeX ctexart class), `--preset` (font size preset: `default` / `small` / `normal` / `large` — one set covering body, code block and headings), `--leading` (line spacing and heading spacing, default `1em`; try `1.2em` for a looser feel), `--font-cjk` / `--font-latin` / `--font-mono` / `--font-mono-cjk` (body / Latin / monospace / CJK-inside-code family; any installed family name, a missing one is reported in the log), `--no-toc`, `--no-chapter-break`, `--pandoc-bin` / `--typst-bin`. See `config.example.json` for all options.
+
+#### Layout and size presets
+
+Both are **opt-in options**; the default settings produce exactly the same output as before (byte for byte):
+
+| Option | Value | Effect |
+| --- | --- | --- |
+| `--style` | `default` | Book layout: Microsoft YaHei body, ruled level-1 headings, centered tables |
+| | `ctexart` | Match LaTeX `ctexart`: SimSun body, SimHei bold & headings, KaiTi italic, `New Computer Modern` for Latin, `DejaVu Sans Mono` + FangSong for code, 0.8em line spacing, centered unruled headings |
+| `--preset` | `default` | Original sizes: 10.5pt body, 8pt code blocks, 16/14/12/11pt headings |
+| | `small` / `normal` / `large` | 9pt / 10.5pt / 12pt body (the ctexart Chinese size system), one set that scales body, code block and headings together |
+
+A preset only supplies **baseline defaults** — a set of defaults, not an indivisible switch. Values you changed in the GUI, individual CLI flags and config-file fields all count as "explicit" and always win: `--preset small` together with a config containing `font.size: "11pt"` gives you an 11pt body. Latin text uses the `New Computer Modern` and `DejaVu Sans Mono` families that ship with typst, so no extra fonts are needed (`Latin Modern` only exists with a TeX Live install and is deliberately not a default).
+
+#### More fine-grained settings
+
+Every item available in the GUI's Detailed mode has a config-file (and where noted, CLI) equivalent:
+
+| What to change | Config field | CLI |
+| --- | --- | --- |
+| Chinese body font | `font.cjk` | `--font-cjk` |
+| Latin font (letters & digits) | `font.latin` (empty = follow the Chinese font) | `--font-latin` |
+| Monospace font (code) | `font.mono` | `--font-mono` |
+| Chinese glyphs inside code | `font.monoCjk` | `--font-mono-cjk` |
+| Body / code font size | `font.size` / `font.monoSize` (a typst length, e.g. `"10.5pt"`) | — |
+| H1–H4 sizes | `font.h1` … `font.h4` (numbers, in pt) | — |
+| Line spacing & heading spacing | `font.leading` | `--leading` |
+| Paper size | `page.paper` (any typst paper name; the GUI offers A4 / A5 / B5 / Letter) | — |
+| Margins | `page.marginX` / `page.marginY` (typst lengths, e.g. `"20mm"`) | — |
+| TOC depth | `toc.depth` | `--toc-depth` |
+| Center level-1 headings (and the TOC title) | `heading.center` | — |
+| Underline headings | `heading.rule` | — |
+| Chinese bold → SimHei, italic → KaiTi | `heading.cjkStyles` | — |
+
+The `heading.*` defaults are the original book layout (left-aligned, underlined, Chinese bold from the family itself); `ctexart` uses centered, unruled headings with SimHei/KaiTi.
 
 ## Star History
 

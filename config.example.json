@@ -6,6 +6,21 @@
   "toc": { "enabled": true, "title": "目录", "depth": 3 },
   "chapterBreak": true,
   "page": { "paper": "a4", "marginX": "20mm", "marginY": "18mm" },
-  "font": { "cjk": "Microsoft YaHei", "latin": "", "mono": "Consolas", "monoCjk": "NSimSun", "size": "10.5pt", "monoSize": "8pt", "leading": "1em" },
+  "style": "default",
+  "font": {
+    "preset": "default",
+    "cjk": "Microsoft YaHei",
+    "latin": "",
+    "mono": "Consolas",
+    "monoCjk": "NSimSun",
+    "size": "10.5pt",
+    "monoSize": "8pt",
+    "leading": "1em",
+    "h1": 16,
+    "h2": 14,
+    "h3": 12,
+    "h4": 11
+  },
+  "heading": { "center": false, "rule": true, "cjkStyles": false },
   "images": { "fetchRemote": false }
 }

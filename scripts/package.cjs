@@ -149,6 +149,12 @@ async function pack() {
   console.log(`⑤ 精简后安装体积: ${mb(after)}（省 ${mb(before - after)}）`);
 
   // 步骤⑥ Inno Setup 出安装包：版本号从 package.json 注入（单一来源），安装脚本内不再硬编码
+  // FOLIO_SKIP_INNO=1 跳过本步：不出安装包，产物就是绿色版 .build/folio-win32-x64/（整个目录拷走即用）
+  if (process.env.FOLIO_SKIP_INNO === '1') {
+    console.log('⑥ 跳过 Inno Setup（FOLIO_SKIP_INNO=1）—— 绿色版: ' + path.join(APP_DIR, 'folio.exe'));
+    console.log('完成（绿色版）：' + APP_DIR + '，耗时 ' + ((Date.now() - t0) / 1000).toFixed(0) + 's');
+    return;
+  }
   console.log('⑥ Inno Setup 编译安装包 …');
   run(ISCC, [`/DMyAppVersion=${VERSION}`, ISS], { cwd: ROOT });
   const exe = path.join(DIST_DIR, SETUP_EXE);

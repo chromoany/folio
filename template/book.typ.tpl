@@ -40,11 +40,10 @@
 
 // 标题样式
 #show heading: set text(weight: "bold")
-#show heading.where(level: 1): set text(size: 16pt)
-#show heading.where(level: 2): set text(size: 14pt)
-#show heading.where(level: 3): set text(size: 12pt)
-#show heading.where(level: 4): set text(size: 11pt)
-{{H1_SHOW}}
+// 各级标题字号（H1–H4）由 bin/folio.cjs 按字号方案（font.preset）注入：默认 = 原有字号
+// 16/14/12/11pt；ctexart 档为 H1 小三 15pt / H2 小四 12pt / H3·H4 五号，H5/H6 不设字号随正文加粗。
+{{HEADING_SIZES}}
+{{BOLD_ITALIC_SHOW}}{{H1_SHOW}}
 // 标题样式：上下间距随行距（{{LEADING}}）联动 —— 只改 #set par(leading:) 不会动到这里，
 // 标题会一直保持旧间距（issue #1 反馈「哪怕选最大行距，标题还是很紧」）。
 // 系数为相对行距的倍数：下方 ≥ 正文列表项间距（实测约 10pt，且不随行距变），上方再放大一档。
