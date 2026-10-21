@@ -20,6 +20,7 @@
 
 - 自动生成目录（含真实页码、可点击跳转）和页脚页码
 - Pandoc + Typst 引擎，公式、代码高亮、表格、列表原生支持，`mermaid` 图（流程图/时序图/饼图等）自动渲染成图嵌入（图的主题与连线样式可在转换选项里选择）
+- GitHub 风味 Markdown：`> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]` 告警块排成彩色提示框，`==高亮==` 排成浅黄底，`[toc]` 在哪写就在哪插一份目录
 - 字体三档可选（正文字体 / 英文字体 / 代码等宽字体，分类同 LaTeX 的 CJKmainfont / mainfont / ttfamily），逐档下拉、列出本机可用字体
 - 单文件 / 多文件合并（每个一级标题自动另起一页）
 - 独立桌面应用：自带 Chromium 内核，无需浏览器、无需 Node.js
@@ -51,7 +52,7 @@
 
 ## 安装
 
-推荐到 [Releases](../../releases) 下载 `folio-1.7.15-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。安装包未做代码签名，如首次运行遇到 SmartScreen 提示，点「更多信息 → 仍要运行」即可。
+推荐到 [Releases](../../releases) 下载 `folio-1.7.16-setup.exe`，双击安装——独立桌面应用，自带全部依赖（Pandoc + Typst + Chromium 内核），装完即用。安装包未做代码签名，如首次运行遇到 SmartScreen 提示，点「更多信息 → 仍要运行」即可。
 
 从源码运行需要 [Node.js](https://nodejs.org/) v18+：
 

@@ -1,6 +1,6 @@
 -- Folio 组件（勿删）：pandoc Lua 过滤器 —— 收集 pandoc markdown reader 的缺口修补
 -- 由 bin/folio.cjs 经 --lua-filter 调用
--- 当前六项修补：
+-- 当前八项修补：
 --   ① HTML 断链：reader 不解析 HTML，raw html 被 typst writer 静默丢弃（见下方【断链根因】）
 --   ② 表格单元格内代码 span 的 `\|` 未反转义（见 unescape_pipe_code）
 --   ③ 分隔线被误判成表格：单独一行的 `---` 被 multiline table 抢走（见 unwrap_dash_table）
@@ -11,6 +11,8 @@
 --      远程图片若 FOLIO_MEDIA_MANIFEST 存在（用户开了联网抓取）则只登记 URL 到清单、留好文件名，
 --      抓取与失败兜底都由 bin/folio.cjs 在 Node 侧做（pandoc 自带 HTTP 栈会硬崩，勿在 Lua 里抓）
 --   ⑥ raw TeX 原样保留为文字：`\LaTeX` 这类 TeX 命令会被 typst writer 静默丢弃（内容丢失）
+--   ⑦ GitHub 告警块 `> [!NOTE]`（NOTE/TIP/IMPORTANT/WARNING/CAUTION）→ 模板里的 #folio-alert 彩色框
+--   ⑧ `[toc]` 独占一行 → 就地展开成 typst outline（目录出现在作者写的位置）
 --
 -- 【断链根因】
 --   pandoc 的 markdown reader 不解析 HTML：`-f markdown` 遇到 <table> 只吐一串
@@ -28,6 +30,7 @@
 --   FOLIO_MEDIA_DIR      图片落盘目录（转换运行目录下的 media/，typst 从 body.typ 相对引用）
 --   FOLIO_SRC_DIRS       原始 md 文件所在目录列表（';' 分隔），相对图片路径按此解析
 --   FOLIO_LANG           界面语言 zh/en，占位文字随语言切换
+--   FOLIO_TOC_DEPTH      `[toc]` 就地展开时的标题深度（缺省 3）
 
 local FORMAT = 'html'
 local BLOCK_TAGS = {
@@ -40,7 +43,7 @@ local STATS = {
   html_blocks = 0, dash_tables = 0,
   empty_links = 0, dead_links = 0,
   img_copied = 0, img_missing = 0,
-  raw_tex = 0,
+  raw_tex = 0, alerts = 0, toc_inserted = 0,
 }
 
 local MEDIA_DIR = os.getenv('FOLIO_MEDIA_DIR')
@@ -386,6 +389,43 @@ local function fix_image(img)
   return missing_placeholder(img)
 end
 
+-- ⑦ GitHub 告警块：pandoc 3.11 的 markdown reader 不认 `> [!NOTE]`，会退化成字面 `[!NOTE]`
+--   （typst writer 还会把方括号转义成 `\[!NOTE\]`）。这里把整个引用块改写成
+--   RawBlock("typst", '#folio-alert("note")[ … ]')，样式定义在 template/book.typ.tpl。
+--   块内容不手写 typst，而是交给 pandoc 自己 write 成 typst —— 嵌套列表/代码块/表格才能原样排版。
+local ALERT_KINDS = { note = true, tip = true, important = true, warning = true, caution = true }
+
+local function alert_kind(bq)
+  if #bq.content == 0 then return nil end
+  local first = bq.content[1]
+  if first.t ~= 'Para' and first.t ~= 'Plain' then return nil end
+  local head = first.content[1]
+  if not head or head.t ~= 'Str' then return nil end
+  local kind = head.text:match('^%[!([%a]+)%]$')
+  if not kind then return nil end
+  kind = kind:lower()
+  if ALERT_KINDS[kind] then return kind end
+  return nil
+end
+
+local function alert_to_typst(bq, kind)
+  local first = bq.content[1]
+  local inls = {}
+  for i = 2, #first.content do inls[#inls + 1] = first.content[i] end
+  if inls[1] and inls[1].t == 'Space' then table.remove(inls, 1) end
+  local blocks = {}
+  if #inls > 0 then blocks[#blocks + 1] = pandoc.Para(inls) end
+  for i = 2, #bq.content do blocks[#blocks + 1] = bq.content[i] end
+  local inner = pandoc.write(pandoc.Pandoc(blocks), 'typst')
+  inner = inner:gsub('^%s+', ''):gsub('%s+$', '')
+  return pandoc.RawBlock('typst', '#folio-alert("' .. kind .. '")[\n' .. inner .. '\n]')
+end
+
+-- ⑧ `[toc]` 独占一行 → typst outline；深度跟顶部目录同口径（FOLIO_TOC_DEPTH，缺省 3）
+local TOC_DEPTH = tonumber(os.getenv('FOLIO_TOC_DEPTH') or '') or 3
+if TOC_DEPTH < 1 then TOC_DEPTH = 1 end
+if TOC_DEPTH > 6 then TOC_DEPTH = 6 end
+
 function Pandoc(doc)
   doc.blocks = fix_blocks(doc.blocks)
   doc = doc:walk({ Inlines = fix_inlines })
@@ -426,11 +466,30 @@ function Pandoc(doc)
       end
     end,
   })
+  -- ⑦⑧ 必须放在链接/图片兜底之后：告警块内容要 write 成 typst，死链等得先降级成纯文本，
+  -- 否则会在框里留下 typst 编不过的 #link(...)。同一轮 walk 里判类型互不干扰。
+  doc = doc:walk({
+    BlockQuote = function(bq)
+      local kind = alert_kind(bq)
+      if not kind then return nil end
+      STATS.alerts = STATS.alerts + 1
+      return alert_to_typst(bq, kind)
+    end,
+    Para = function(p)
+      if #p.content == 1 and p.content[1].t == 'Str' then
+        local txt = p.content[1].text:lower()
+        if txt == '[toc]' or txt == '[[toc]]' then
+          STATS.toc_inserted = STATS.toc_inserted + 1
+          return pandoc.RawBlock('typst', '#block(above: 1.2em, below: 1.2em)[#outline(title: none, indent: auto, depth: ' .. TOC_DEPTH .. ')]')
+        end
+      end
+    end,
+  })
   -- 统计交给 bin/folio.cjs：优先写报告文件（路径由环境变量给，stdio 被 inherit 时也能拿到），
   -- 再往 stderr 写一行机器可读的版本，便于单独手跑 pandoc 时诊断
   local order = {
     'html_blocks', 'dash_tables', 'empty_links', 'dead_links',
-    'img_copied', 'img_missing', 'raw_tex',
+    'img_copied', 'img_missing', 'raw_tex', 'alerts', 'toc_inserted',
   }
   local buf = {}
   for _, k in ipairs(order) do buf[#buf + 1] = k .. '=' .. tostring(STATS[k]) end

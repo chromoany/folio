@@ -54,6 +54,11 @@
 #show heading.where(level: 5): it => block(above: 1.4 * {{LEADING}}, below: 1.2 * {{LEADING}}, it)
 #show heading.where(level: 6): it => block(above: 1.3 * {{LEADING}}, below: 1.2 * {{LEADING}}, it)
 
+// `==高亮==`：pandoc 的 mark 扩展转成 #highlight[...]，typst 默认底色偏灰，统一成打印友好的浅黄。
+// 告警块宏（#folio-alert）不放这里：typst 的 include 不继承主文件定义，宏由 bin/folio.cjs
+// 直接顶在 body.typ 开头（BODY_MACROS）。这里只留全文档生效的 show 规则。
+#show highlight: set highlight(fill: rgb("#fdf0a3"))
+
 {{TITLE_BLOCK}}
 {{TOC_BLOCK}}
 

@@ -20,6 +20,7 @@ Convert Markdown files into a **book-style PDF** with a table of contents and pa
 
 - Auto-generated table of contents (real page numbers, clickable) and page-numbered footer
 - Pandoc + Typst engine: math, syntax highlighting, tables, and lists work natively; `mermaid` diagrams (flowcharts, sequence, pie, …) are rendered into the PDF (diagram theme and line style are selectable in the conversion options)
+- GitHub-flavored Markdown: `> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]` alerts become coloured callout boxes, `==highlight==` gets a pale-yellow background, and `[toc]` inserts a table of contents right where you write it
 - Three font families selectable (body / Latin / monospace, classified like LaTeX's CJKmainfont / mainfont / ttfamily); each dropdown lists the fonts available on this machine
 - Single file or merge multiple files (each H1 starts on a new page)
 - Standalone desktop app: bundled Chromium, no browser or Node.js needed
@@ -51,7 +52,7 @@ Merging multiple files is nothing special by itself — a one-line Pandoc comman
 
 ## Install
 
-Recommended: download `folio-1.7.15-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
+Recommended: download `folio-1.7.16-setup.exe` from [Releases](../../releases), double-click to install — a standalone desktop app with all dependencies bundled (pandoc + typst + Chromium), ready to use. The installer is not code-signed; if SmartScreen shows a prompt on first run, click "More info → Run anyway".
 
 To run from source, [Node.js](https://nodejs.org/) v18+ is required:
 

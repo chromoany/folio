@@ -24,10 +24,55 @@ const TMP = process.env.FOLIO_TMP || path.join(os.tmpdir(), 'folio-runs');
 // pandoc 读 markdown 的格式串。必须带 -citations：pandoc 默认把正文里的 @xxx 解析成引文，
 // 输出 #cite(<xxx>) 让 typst 报 "does not contain a bibliography" 整本编译失败。
 // Folio 不生成参考文献（无 --citeproc / --bibliography），关掉纯赚：@提及 会正常转义成 \@xxx。
-const PANDOC_FROM = 'markdown-citations+tex_math_dollars';
+// +mark：`==高亮==` 是 pandoc 的 mark 扩展，默认关；开了才输出 #highlight[...]（模板里统一样式）。
+const PANDOC_FROM = 'markdown-citations+tex_math_dollars+mark';
 // 修补 pandoc 缺口的 Lua 过滤器（HTML 断链 / 空链接与死锚点 / 图片兜底 / raw TeX 保留，
 // 随 template/ 一起分发，见该文件头部注释）。缺失时自动降级
 const HTML_FIX_LUA = path.join(ROOT, 'template', 'pandoc-html-fix.lua');
+
+// body.typ 前置宏：typst 的 `#include` 不会把主文件里的定义带进被包含文件的作用域
+// （实测 #folio-alert 在 body.typ 里报 unknown variable），所以宏必须顶在 body.typ 自身前面。
+// 只放「被 pandoc 输出直接调用」的宏；#highlight 之类的 show 规则留在模板里（作用是全文档的）。
+// 标签跟随界面语言（zh 中文 / en 英文）——中文标签塞进英文文档里太出戏。
+const ALERT_LABELS = {
+  zh: { note: '提示', tip: '技巧', important: '重要', warning: '注意', caution: '警告' },
+  en: { note: 'NOTE', tip: 'TIP', important: 'IMPORTANT', warning: 'WARNING', caution: 'CAUTION' },
+};
+const bodyMacros = (lang) => {
+  const L = ALERT_LABELS[lang] || ALERT_LABELS.zh;
+  const spec = [
+    `    note: (label: "${L.note}", fill: rgb("#eff4fb"), bar: rgb("#3f74b5")),`,
+    `    tip: (label: "${L.tip}", fill: rgb("#eef8f0"), bar: rgb("#2f8a4e")),`,
+    `    important: (label: "${L.important}", fill: rgb("#f4f0fc"), bar: rgb("#6b4fc2")),`,
+    `    warning: (label: "${L.warning}", fill: rgb("#fdf7e8"), bar: rgb("#c08a12")),`,
+    `    caution: (label: "${L.caution}", fill: rgb("#fceeee"), bar: rgb("#b83b30")),`,
+  ].join('\n');
+  return `
+// GitHub 告警块（> [!NOTE] 等）：pandoc-html-fix.lua 把引用块改写成 #folio-alert("kind")[内容]。
+// 五档沿用 GitHub 语义。打印口径：浅底 + 左侧 3pt 竖条 —— 灰度打印靠竖条与粗体标签区分，
+// 底色只是辅助（不用 emoji：字体缺字形会变豆腐块）。
+#let folio-alert(kind, body) = {
+  let spec = (
+${spec}
+  )
+  let s = spec.at(kind, default: spec.note)
+  block(
+    width: 100%,
+    above: 1.2em,
+    below: 1.2em,
+    fill: s.fill,
+    stroke: (left: 3pt + s.bar),
+    inset: (x: 10pt, y: 8pt),
+    radius: 3pt,
+    breakable: true,
+  )[
+    #text(weight: "bold", fill: s.bar, size: 0.95em)[#s.label]
+    #v(-0.5em)
+    #body
+  ]
+}
+`;
+};
 
 // 界面语言（zh/en）：GUI 经 cfg.lang 传入，CLI 默认中文；转换日志与错误提示随语言切换
 let UI_LANG = 'zh';
@@ -61,6 +106,8 @@ const MSG = {
     mermaidRendered: (n) => `[folio] 渲染 ${n} 个 mermaid 图并嵌入 PDF`,
     mermaidFailed: (n) => `[folio] ${n} 个 mermaid 图渲染失败（语法错误或超时），保留为代码块`,
     mermaidReason: (v) => `[folio] mermaid 渲染失败原因：${v}`,
+    alerts: (n) => `[folio] ${n} 个 GitHub 告警块已样式化（[!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION]）`,
+    tocInserted: (n) => `[folio] 就地插入 ${n} 处目录（[toc]）`,
     mermaidForeignObject: (n) => `[folio] ${n} 个 mermaid 图的文字走 HTML 渲染（typst 不支持 foreignObject，图内文字可能缺失，如 journey 图）`,
     mermaidSkipped: (n) => `[folio] ${n} 个 mermaid 代码块未渲染（mermaid 需要浏览器内核，命令行模式保留为代码块）`,
     badMermaidTheme: (v) => `未知的 mermaid 主题：${v}（可选：${MERMAID_THEMES.join(' / ')}）`,
@@ -84,6 +131,8 @@ const MSG = {
     failed: (label, status, tail) => `${label} failed (exit code ${status})${tail ? '\n' + tail : ''}`,
     // Notes about content Folio changed in the source: every silent rewrite must leave a trace
     skipToc: (n) => `[folio] skipped ${n} hand-written TOC section(s) (the TOC is generated from headings)`,
+    alerts: (n) => `[folio] styled ${n} GitHub alert block(s) ([!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION])`,
+    tocInserted: (n) => `[folio] inserted ${n} table of contents ([toc]) at the marked position(s)`,
     paddedBlocks: (parts) => `[folio] source was preprocessed: ${parts.join('; ')} (pandoc needs block-level syntax; otherwise they merge into the previous paragraph)`,
     padLists: (n) => `${n} list(s)`,
     padTables: (n) => `${n} table(s)`,
@@ -339,7 +388,17 @@ function cleanMarkdown(src, report = () => {}) {
       if (/^#{1,6}\s+/.test(t) || /<div[^>]*page-break/i.test(line)) closeToc();
       else { tocLines++; continue; }
     }
-    if (/^\s*\[TOC\]\s*$/i.test(t)) continue;
+    // `[toc]` 不再丢弃：原样留给 pandoc，由 Lua 过滤器就地换成 typst 的 outline
+    // （用户写在哪就在哪出一份目录；不写就仍用模板前置的那份自动目录）。
+    // GitHub 告警块的标记行后面补一行空引用：pandoc 的 markdown 要求列表/代码块前有空行，
+    // 否则 `> [!NOTE]` 紧跟 `> - 第一项` 会被读成同一段文字（列表变「- 第一项 - 第二项」）。
+    if (/^\s*>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*$/i.test(line)) {
+      const bar = line.match(/^\s*>/)[0];
+      const nxt = lines[i + 1] || '';
+      out.push(line);
+      if (/^\s*>/.test(nxt) && !/^\s*>\s*$/.test(nxt)) out.push(bar);
+      continue;
+    }
     let l = line
       .replace(/<a\s+id="[^"]*">\s*<\/a>/gi, '')
       .replace(/<\/?div[^>]*>/gi, '')
@@ -833,6 +892,8 @@ async function build(cfg, { log = () => {} } = {}) {
     FOLIO_MEDIA_DIR: mediaDir,
     FOLIO_SRC_DIRS: srcDirs,
     FOLIO_LANG: UI_LANG,
+    // `[toc]` 就地展开成 outline 时用哪一档深度（跟顶部目录同一口径）
+    FOLIO_TOC_DEPTH: String((cfg.toc && cfg.toc.depth) || 3),
   };
   if (fetchRemote) env.FOLIO_MEDIA_MANIFEST = manifestFile;
   const stderr = run(pandocBin, ['-f', PANDOC_FROM, '-t', 'typst', '--wrap=none', ...filterArgs, '-o', bodyFile, ...cleanedInputs.map((x) => path.resolve(x))],
@@ -847,6 +908,7 @@ async function build(cfg, { log = () => {} } = {}) {
     ['htmlBlocks', 'html_blocks'], ['dashTables', 'dash_tables'],
     ['emptyLinks', 'empty_links'], ['deadLinks', 'dead_links'],
     ['imgCopied', 'img_copied'], ['imgMissing', 'img_missing'], ['rawTex', 'raw_tex'],
+    ['alerts', 'alerts'], ['tocInserted', 'toc_inserted'],
   ];
   for (const [key, stat] of reportKeys) {
     const n = grab(stat);
@@ -855,6 +917,7 @@ async function build(cfg, { log = () => {} } = {}) {
 
   // 远程图片（勾选抓取时）：Node 侧抓取、按内容正名；抓不到降级占位文字
   let bodyTyp = fs.readFileSync(bodyFile, 'utf8');
+  bodyTyp = bodyMacros(UI_LANG) + '\n' + bodyTyp;
   if (fetchRemote) bodyTyp = await fetchRemoteImages(bodyTyp, manifestFile, mediaDir, log);
   // pandoc 写出的 typst 列宽可能病态偏窄（中文表格尤甚），编译前兜底一次
   fs.writeFileSync(bodyFile, fixNarrowColumns(bodyTyp, (m2) => log(m2)), 'utf8');
